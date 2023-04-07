@@ -4,12 +4,13 @@ from flask import Flask, request
 app = Flask(__name__)
 
 # Initialize the exchanges
+
 exchanges = {}
 config = {
     "BYBIT": {
         "API_KEY": "",
         "API_SECRET": "",
-        "ENABLED": True,
+        "ENABLED": False,
         "TESTNET": False
     },
     "BINANCE": {
@@ -19,8 +20,8 @@ config = {
         "TESTNET": False
     },
     "BINANCE_TESTNET": {
-        "API_KEY": "",
-        "API_SECRET": "",
+        "API_KEY": "18cdb3cc1757b7e14d678009713ab9506257dd28366bc9852df83ed46c89f135",
+        "API_SECRET": "d45b531786836d30a2fd35ea5f5ec8a564cfb6c1baa768ebb4be01cab004c745",
         "ENABLED": True,
         "TESTNET": True
     }
