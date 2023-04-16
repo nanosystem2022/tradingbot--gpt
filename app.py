@@ -2,17 +2,17 @@ import os
 import ccxt
 import json
 from flask import Flask, request
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = Flask(__name__)
 
 with open('config.json') as config_file:
     config = json.load(config_file)
 
-# Adding a queue to store pending orders when a position is open
 pending_orders = []
+
+@app.route('/')
+def index():
+    return {'message': 'Server is running!'}
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -48,7 +48,6 @@ def execute_trade(data):
     market = data['market']
     order_type = data['type']
 
-    # Fetch current position
     position = exchange.fetch_position(symbol)
     position_open = position['side'] != 'none'
 
@@ -59,29 +58,17 @@ def execute_trade(data):
             else:
                 exchange.create_market_sell_order(symbol, market)
 
-            # If there are any pending orders, remove them
             pending_orders.clear()
         else:
-            print("Position is already open. Adding the order to the pending orders list.")
-            pending_orders.append(data)
+            print("Position is already open. Ignoring the new order.")
     elif order_type == 'close-long':
         if position_open and position['side'] == 'long':
             exchange.create_market_sell_order(symbol, position['size'])
-
-            # Execute the first pending order after closing the position
-            if pending_orders:
-                first_pending_order = pending_orders.pop(0)
-                execute_trade(first_pending_order)
     elif order_type == 'close-short':
         if position_open and position['side'] == 'short':
             exchange.create_market_buy_order(symbol, position['size'])
-
-            # Execute the first pending order after closing the position
-            if pending_orders:
-                first_pending_order = pending_orders.pop(0)
-                execute_trade(first_pending_order)
     else:
         print("Invalid order type")
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=False)
