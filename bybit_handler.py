@@ -1,5 +1,3 @@
-from pybit import HTTP
-
 def handle_bybit_request(session: HTTP, data: dict):
     action = data['action']
 
