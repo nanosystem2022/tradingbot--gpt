@@ -1,4 +1,4 @@
 Flask==2.1.1
-ccxt==1.63.92 --find-links https://github.com/ccxt/ccxt/archive/1.63.92.tar.gz
+ccxt==3.0.69
 pybit==1.4.4
 gunicorn==20.1.0
