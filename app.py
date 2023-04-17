@@ -1,6 +1,5 @@
 import json
 from flask import Flask, request
-from pybit import HTTP
 import ccxt
 from binanceFutures import handle_binance_request
 from bybit_handler import handle_bybit_request
