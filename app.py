@@ -76,6 +76,61 @@ def create_order_bybit(data, session):
             "message": str(e)
         }, 500
 
+def close_position_binance(data, exchange):
+    symbol = data['symbol']
+    side = data['side']
+
+    try:
+        position = exchange.private_post_positionrisk({'symbol': symbol})
+        if position and float(position[0]['positionAmt']) != 0:
+            order_side = 'sell' if side == 'CloseLong' else 'buy'
+            order = exchange.create_market_order(symbol, order_side, abs(float(position[0]['positionAmt'])))
+            return {
+                "status": "success",
+                "data": order
+            }, 200
+        else:
+            return {
+                "status": "error",
+                "message": "No open position found."
+            }, 400
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+def close_position_bybit(data, session):
+    symbol = data['symbol']
+    side = data['side']
+
+    try:
+        position = session.get('/v2/private/position/list', params={'symbol': symbol}).json()
+        if position['result'] and float(position['result']['size']) != 0:
+            order_side = 'Sell' if side == 'CloseLong' else 'Buy'
+            order = session.post('/v2/private/order/create', json={
+                'symbol': symbol,
+                'side': order_side,
+                'order_type': 'Market',
+                'qty': abs(float(position['result']['size'])),
+                'time_in_force': 'GTC'
+            })
+            return {
+                "status": "success",
+                "data": order.json()
+            }, 200
+        else:
+            return {
+                "status": "error",
+                "message": "No open position found."
+            }, 400
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
 
@@ -115,6 +170,23 @@ def webhook():
     print("Hook Received!")
     data = json.loads(request.data)
     print(data)
+
+    # Check if the webhook is to close a position
+    if 'side' in data and (data['side'] == 'CloseLong' or data['side'] == 'CloseShort'):
+        exchange_id = data['exchange']
+        exchange = get_exchange_by_id(exchange_id)
+        if not exchange:
+            return {
+                "status": "error",
+                "message": f"Exchange '{exchange_id}' not found"
+            }, 404
+
+        if exchange_id == 'binance-futures':
+            return close_position_binance(data, exchange)
+        elif exchange_id == 'bybit':
+            session = get_bybit_session()
+            return close_position_bybit(data, session)
+
 
     if int(data['key']) != config['KEY']:
         error_message = "Invalid Key, Please Try Again!"
