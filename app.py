@@ -1,8 +1,12 @@
 import json
+import logging
 from flask import Flask, render_template, request, jsonify
 import time
 import ccxt
 from custom_http import HTTP
+
+app = Flask(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 
@@ -42,10 +46,12 @@ def create_order_binance(data, exchange):
             "data": order
         }, 200
     except Exception as e:
+        logging.debug(f"Error in create_order_binance: {str(e)}")
         return {
             "status": "error",
             "message": str(e)
         }, 500
+
 
 def create_order_bybit(data, session):
     symbol = data['symbol']
@@ -74,6 +80,7 @@ def create_order_bybit(data, session):
             "data": order.json()
         }, 200
     except Exception as e:
+        logging.debug(f"Error in create_order_bybit: {str(e)}")
         return {
             "status": "error",
             "message": str(e)
