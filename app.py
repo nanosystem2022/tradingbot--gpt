@@ -199,7 +199,7 @@ def webhook():
                 if data['action'] == 'closeshort':
                     side = 'Buy'
                 elif data['action'] == 'closelong':
-                side = 'Sell'
+                    side = 'Sell'
                 order = session.get(f'/v2/private/order?symbol={data["symbol"]}&order_id={open_trade_id}')
                 response, status_code = close_order_bybit(
                     open_trade_id,
