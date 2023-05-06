@@ -21,18 +21,31 @@ def is_exchange_enabled(exchange_name):
     return False
 
 
-def create_order_binance(data, exchange):
-    symbol = data['symbol']
-    side = data['side']
-    price = data.get('price', 0)
-    quantity = data.get('quantity')
+def validate_input_data(data):
+    required_fields = ['symbol', 'side', 'type']
 
-    if quantity is None:
-        error_message = "The 'quantity' field is missing in the input data."
+    for field in required_fields:
+        if field not in data:
+            return False, f"The '{field}' field is missing in the input data."
+
+    if 'quantity' not in data or not data['quantity']:
+        return False, "The 'quantity' field is missing or empty in the input data."
+
+    return True, None
+
+
+def create_order_binance(data, exchange):
+    validation_status, error_message = validate_input_data(data)
+    if not validation_status:
         return {
             "status": "error",
             "message": error_message
         }, 400
+
+    symbol = data['symbol']
+    side = data['side']
+    price = data.get('price', 0)
+    quantity = data.get('quantity')
 
     try:
         order = exchange.create_order(
@@ -55,17 +68,17 @@ def create_order_binance(data, exchange):
 
 
 def create_order_bybit(data, session):
-    symbol = data['symbol']
-    side = data['side']
-    price = data.get('price', 0)
-    quantity = data.get('quantity')
-
-    if quantity is None:
-        error_message = "The 'quantity' field is missing in the input data."
+    validation_status, error_message = validate_input_data(data)
+    if not validation_status:
         return {
             "status": "error",
             "message": error_message
         }, 400
+
+    symbol = data['symbol']
+    side = data['side']
+    price = data.get('price', 0)
+    quantity = data.get('quantity')
 
     try:
         order = session.post('/v2/private/order/create', json={
@@ -86,6 +99,7 @@ def create_order_bybit(data, session):
             "message": f"An error occurred: {str(e)}",
             "traceback": traceback.format_exc()
         }, 500
+
 
 def close_order_binance(symbol, side, remaining, exchange):
     try:
@@ -178,6 +192,13 @@ def webhook():
 
     # Handle close trade requests
     if data.get('action') in ['closeshort', 'closelong']:
+        if not open_trade:
+            error_message = "There is no open trade to close."
+            return {
+                "status": "error",
+                "message": error_message
+            }, 400
+
         close_trade_handlers = {
             'binance-futures': (use_binance_futures, close_order_binance),
             'bybit': (use_bybit, close_order_bybit)
@@ -250,3 +271,4 @@ def webhook():
 
 if __name__ == '__main__':
     app.run()
+
