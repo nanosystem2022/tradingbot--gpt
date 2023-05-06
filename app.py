@@ -6,12 +6,15 @@ from custom_http import HTTP
 
 app = Flask(__name__)
 
-# Load config.json
+# load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
 
 def is_exchange_enabled(exchange_name):
-    return config['EXCHANGES'].get(exchange_name, {}).get('ENABLED', False)
+    if exchange_name in config['EXCHANGES']:
+        if config['EXCHANGES'][exchange_name]['ENABLED']:
+            return True
+    return False
 
 def create_order_binance(data, exchange):
     symbol = data['symbol']
@@ -76,46 +79,21 @@ def create_order_bybit(data, session):
             "message": str(e)
         }, 500
 
-def close_position_binance(data, exchange):
-    symbol = data['symbol']
-    try:
-        result = exchange.private_post_positionmargin_type(
-            {"symbol": exchange.market_id(symbol), "type": "2", "amount": "0"}
-        )
-        return {
-            "status": "success",
-            "data": result
-        }, 200
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }, 500
 
 def close_order_binance(data, exchange):
     symbol = data['symbol']
-
     try:
-        positions = exchange.fapiPrivate_get_positionrisk({"symbol": symbol})
-        position_to_close = None
-        for position in positions:
-            if float(position["positionAmt"]) != 0:
-                position_to_close = position
-                break
-
-        if position_to_close:
-            side = "buy" if float(position_to_close["positionAmt"]) < 0 else "sell"
-            order = exchange.create_market_order(symbol=symbol, side=side, amount=abs(float(position_to_close["positionAmt"])))
-            return {
-                "status": "success",
-                "data": order
-            }, 200
-        else:
-            error_message = f"No open position found for symbol {symbol}."
+        position = exchange.fapiPrivate_get_positionrisk({'symbol': exchange.market_id(symbol)})
+        if float(position['entryPrice']) == 0:
             return {
                 "status": "error",
-                "message": error_message
+                "message": "No open position found"
             }, 400
+        order = exchange.create_market_order(symbol, 'sell', float(position['positionAmt']))
+        return {
+            "status": "success",
+            "data": order
+        }, 200
     except Exception as e:
         return {
             "status": "error",
@@ -124,35 +102,24 @@ def close_order_binance(data, exchange):
 
 def close_order_bybit(data, session):
     symbol = data['symbol']
-
     try:
-        response = session.get('/v2/private/position/list', params={"symbol": symbol})
-        positions = response.json()["result"]
-        position_to_close = None
-        for position in positions:
-            if position["size"] != 0:
-                position_to_close = position
-                break
-
-        if position_to_close:
-            side = "Buy" if position_to_close["side"] == "Sell" else "Sell"
-            order = session.post('/v2/private/order/create', json={
-                'symbol': symbol,
-                'side': side,
-                'order_type': 'Market',
-                'qty': position_to_close["size"],
-                'time_in_force': 'GTC'
-            })
-            return {
-                "status": "success",
-                "data": order.json()
-            }, 200
-        else:
-            error_message = f"No open position found for symbol {symbol}."
+        position = session.get('/v2/private/position/list', {'symbol': symbol}).json()
+        if position['result'][symbol]['size'] == 0:
             return {
                 "status": "error",
-                "message": error_message
+                "message": "No open position found"
             }, 400
+        order = session.post('/v2/private/order/create', json={
+            'symbol': symbol,
+            'side': 'Sell',
+            'order_type': 'Market',
+            'qty': position['result'][symbol]['size'],
+            'reduce_only': True
+        })
+        return {
+            "status": "success",
+            "data": order.json()
+        }, 200
     except Exception as e:
         return {
             "status": "error",
@@ -161,6 +128,7 @@ def close_order_bybit(data, session):
 
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
+
 
 if use_bybit:
     print("Bybit is enabled!")
@@ -189,6 +157,7 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
+
 @app.route('/')
 def index():
     return {'message': 'Server is running!'}
@@ -209,7 +178,7 @@ def webhook():
 
     if data['exchange'] == 'binance-futures':
         if use_binance_futures:
-            if data['action'] == 'close':
+            if data['side'] == 'CloseLong':
                 response, status_code = close_order_binance(data, exchange)
             else:
                 response, status_code = create_order_binance(data, exchange)
@@ -223,7 +192,7 @@ def webhook():
 
     elif data['exchange'] == 'bybit':
         if use_bybit:
-            if data['action'] == 'close':
+            if data['side'] == 'CloseLong':
                 response, status_code = close_order_bybit(data, session)
             else:
                 response, status_code = create_order_bybit(data, session)
