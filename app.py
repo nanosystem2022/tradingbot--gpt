@@ -2,6 +2,7 @@ import json
 from flask import Flask, jsonify, request
 import ccxt
 from custom_http import HTTP
+import traceback
 
 app = Flask(__name__)
 
@@ -48,8 +49,10 @@ def create_order_binance(data, exchange):
     except Exception as e:
         return {
             "status": "error",
-            "message": str(e)
+            "message": f"An error occurred: {str(e)}",
+            "traceback": traceback.format_exc()
         }, 500
+
 
 
 def create_order_bybit(data, session):
@@ -81,7 +84,8 @@ def create_order_bybit(data, session):
     except Exception as e:
         return {
             "status": "error",
-            "message": str(e)
+            "message": f"An error occurred: {str(e)}",
+            "traceback": traceback.format_exc()
         }, 500
 
 def close_order_binance(symbol, side, remaining, exchange):
@@ -99,7 +103,8 @@ def close_order_binance(symbol, side, remaining, exchange):
     except Exception as e:
         return {
             "status": "error",
-            "message": str(e)
+            "message": f"An error occurred: {str(e)}",
+            "traceback": traceback.format_exc()
         }, 500
 
 
@@ -119,7 +124,8 @@ def close_order_bybit(symbol, side, remaining, session):
     except Exception as e:
         return {
             "status": "error",
-            "message": str(e)
+            "message": f"An error occurred: {str(e)}",
+            "traceback": traceback.format_exc()
         }, 500
 
 use_bybit = is_exchange_enabled('BYBIT')
