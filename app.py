@@ -187,9 +187,9 @@ def webhook():
                 else:
                     side = 'sell'
 
-                order = exchange.fetch_order(open_trade_id, symbol=data['symbol'])
+                order = exchange.fetch_order(id=open_trade_id, symbol=data['symbol'])
                 response, status_code = handler(
-                    open_trade_id,
+                    order['id'],  # Use the 'id' from the fetched order
                     data['symbol'],
                     side,
                     order['remaining'],
