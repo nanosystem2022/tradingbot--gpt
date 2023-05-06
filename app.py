@@ -84,8 +84,7 @@ def create_order_bybit(data, session):
             "message": str(e)
         }, 500
 
-
-def close_order_binance(order_id, symbol, side, remaining, exchange):
+def close_order_binance(symbol, side, remaining, exchange):
     try:
         order = exchange.create_order(
             symbol=symbol,
@@ -104,7 +103,7 @@ def close_order_binance(order_id, symbol, side, remaining, exchange):
         }, 500
 
 
-def close_order_bybit(order_id, symbol, side, remaining, session):
+def close_order_bybit(symbol, side, remaining, session):
     try:
         order = session.post('/v2/private/order/create', json={
             'symbol': symbol,
@@ -189,12 +188,12 @@ def webhook():
 
                 order = exchange.fetch_order(id=open_trade_id, symbol=data['symbol'])
                 response, status_code = handler(
-                    order['id'],  # Use the 'id' from the fetched order
                     data['symbol'],
                     side,
                     order['remaining'],
                     exchange
                 )
+
                 open_trade = False
                 open_trade_id = None
             else:
