@@ -54,7 +54,6 @@ def create_order_binance(data, exchange):
         }, 500
 
 
-
 def create_order_bybit(data, session):
     symbol = data['symbol']
     side = data['side']
@@ -197,7 +196,7 @@ def webhook():
                     data['symbol'],
                     side,
                     order['remaining'],
-                    exchange
+                    exchange if data['exchange'] == 'binance-futures' else session
                 )
 
                 open_trade = False
