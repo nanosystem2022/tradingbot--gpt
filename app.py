@@ -1,12 +1,8 @@
 import json
-import logging
 from flask import Flask, render_template, request, jsonify
 import time
 import ccxt
 from custom_http import HTTP
-
-app = Flask(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 
@@ -46,12 +42,10 @@ def create_order_binance(data, exchange):
             "data": order
         }, 200
     except Exception as e:
-        logging.debug(f"Error in create_order_binance: {str(e)}")
         return {
             "status": "error",
             "message": str(e)
         }, 500
-
 
 def create_order_bybit(data, session):
     symbol = data['symbol']
@@ -80,54 +74,6 @@ def create_order_bybit(data, session):
             "data": order.json()
         }, 200
     except Exception as e:
-        logging.debug(f"Error in create_order_bybit: {str(e)}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }, 500
-
-
-def close_order_binance(data, exchange):
-    symbol = data['symbol']
-    try:
-        position = exchange.fapiPrivate_get_positionrisk({'symbol': exchange.market_id(symbol)})
-        if float(position['entryPrice']) == 0:
-            return {
-                "status": "error",
-                "message": "No open position found"
-            }, 400
-        order = exchange.create_market_order(symbol, 'sell', float(position['positionAmt']))
-        return {
-            "status": "success",
-            "data": order
-        }, 200
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }, 500
-
-def close_order_bybit(data, session):
-    symbol = data['symbol']
-    try:
-        position = session.get('/v2/private/position/list', {'symbol': symbol}).json()
-        if position['result'][symbol]['size'] == 0:
-            return {
-                "status": "error",
-                "message": "No open position found"
-            }, 400
-        order = session.post('/v2/private/order/create', json={
-            'symbol': symbol,
-            'side': 'Sell',
-            'order_type': 'Market',
-            'qty': position['result'][symbol]['size'],
-            'reduce_only': True
-        })
-        return {
-            "status": "success",
-            "data": order.json()
-        }, 200
-    except Exception as e:
         return {
             "status": "error",
             "message": str(e)
@@ -135,7 +81,6 @@ def close_order_bybit(data, session):
 
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
-
 
 if use_bybit:
     print("Bybit is enabled!")
@@ -164,13 +109,48 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
-
 @app.route('/')
 def index():
     return {'message': 'Server is running!'}
 
+current_order = None
+
+def close_order(order_id, exchange_name):
+    global current_order
+
+    if exchange_name == 'binance-futures':
+        try:
+            closed_order = exchange.cancel_order(order_id)
+            current_order = None
+            return {
+                "status": "success",
+                "data": closed_order
+            }, 200
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e)
+            }, 500
+    elif exchange_name == 'bybit':
+        try:
+            closed_order = session.post('/v2/private/order/cancel', json={
+                'order_id': order_id
+            })
+            current_order = None
+            return {
+                "status": "success",
+                "data": closed_order.json()
+            }, 200
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e)
+            }, 500
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    global current_order
+
     print("Hook Received!")
     data = json.loads(request.data)
     print(data)
@@ -183,36 +163,63 @@ def webhook():
             "message": error_message
         }, 400
 
-    if data['exchange'] == 'binance-futures':
-        if use_binance_futures:
-            if data['side'] == 'CloseLong':
-                response, status_code = close_order_binance(data, exchange)
-            else:
-                response, status_code = create_order_binance(data, exchange)
-            return jsonify(response), status_code
-        else:
-            error_message = "Binance Futures is not enabled in the config file."
+    action = data.get('action', 'open')
+
+    if action == 'open':
+        if current_order:
+            error_message = "There is already an open order."
             return {
                 "status": "error",
                 "message": error_message
             }, 400
 
-    elif data['exchange'] == 'bybit':
-        if use_bybit:
-            if data['side'] == 'CloseLong':
-                response, status_code = close_order_bybit(data, session)
+        if data['exchange'] == 'binance-futures':
+            if use_binance_futures:
+                response, status_code = create_order_binance(data, exchange)
+                if response['status'] == 'success':
+                    current_order = response['data']
+               
+                return jsonify(response), status_code
             else:
+                error_message = "Binance Futures is not enabled in the config file."
+                return {
+                    "status": "error",
+                    "message": error_message
+                }, 400
+
+        elif data['exchange'] == 'bybit':
+            if use_bybit:
                 response, status_code = create_order_bybit(data, session)
-            return jsonify(response), status_code
+                if response['status'] == 'success':
+                    current_order = response['data']
+                return jsonify(response), status_code
+            else:
+                error_message = "Bybit is not enabled in the config file."
+                return {
+                    "status": "error",
+                    "message": error_message
+                }, 400
+
         else:
-            error_message = "Bybit is not enabled in the config file."
+            error_message = "Unsupported exchange."
             return {
                 "status": "error",
                 "message": error_message
             }, 400
+
+    elif action == 'closeshort' or action == 'closelong':
+        if not current_order:
+            error_message = "There is no open order to close."
+            return {
+                "status": "error",
+                "message": error_message
+            }, 400
+
+        response, status_code = close_order(current_order['id'], current_order['exchange'])
+        return jsonify(response), status_code
 
     else:
-        error_message = "Unsupported exchange."
+        error_message = "Unsupported action."
         return {
             "status": "error",
             "message": error_message
