@@ -169,7 +169,7 @@ def webhook():
             "message": error_message
         }, 400
 
-    if data['action'] in ['closeshort', 'closelong']:
+    if data.get('action') in ['closeshort', 'closelong']:
         # Close trade
         if data['exchange'] == 'binance-futures':
             if use_binance_futures:
