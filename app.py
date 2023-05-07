@@ -100,7 +100,6 @@ def create_order_bybit(data, session):
             "traceback": traceback.format_exc()
         }, 500
 
-
 def close_order_binance(symbol, side, remaining, exchange):
     try:
         order = exchange.create_order(
@@ -203,7 +202,7 @@ def webhook():
                 if data['action'] == 'closeshort':
                     side = 'buy'
                 else:
-                    side = 'sell'
+                side = 'sell'
 
                 order = exchange.fetch_order(id=open_trade_id, symbol=data['symbol'])
                 response, status_code = handler(
@@ -215,7 +214,7 @@ def webhook():
 
                 open_trade = False
                 open_trade_id = None
-                return jsonify(response), status_code  # Add this line
+                return jsonify(response), status_code
             else:
                 error_message = f"{data['exchange']} is not enabled in the config file."
                 return {
