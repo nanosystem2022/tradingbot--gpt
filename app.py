@@ -202,7 +202,7 @@ def webhook():
                 if data['action'] == 'closeshort':
                     side = 'buy'
                 else:
-                side = 'sell'
+                    side = 'sell'
 
                 order = exchange.fetch_order(id=open_trade_id, symbol=data['symbol'])
                 response, status_code = handler(
