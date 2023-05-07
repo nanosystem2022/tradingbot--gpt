@@ -192,13 +192,6 @@ def webhook():
 
     # Handle close trade requests
     if data.get('action') in ['closeshort', 'closelong']:
-        if not open_trade:
-            error_message = "There is no open trade to close."
-            return {
-                "status": "error",
-                "message": error_message
-            }, 400
-
         close_trade_handlers = {
             'binance-futures': (use_binance_futures, close_order_binance),
             'bybit': (use_bybit, close_order_bybit)
@@ -222,6 +215,7 @@ def webhook():
 
                 open_trade = False
                 open_trade_id = None
+                return jsonify(response), status_code  # Add this line
             else:
                 error_message = f"{data['exchange']} is not enabled in the config file."
                 return {
@@ -234,6 +228,7 @@ def webhook():
                 "status": "error",
                 "message": error_message
             }, 400
+
     # Handle open trade requests
     elif not open_trade:
         open_trade_handlers = {
