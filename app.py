@@ -135,6 +135,11 @@ def webhook():
         if side == 'closeshort' and user_trade_status[symbol] != 'sell':
             return {"status": "error", "message": "Cannot close short because there is no open short position."}, 400
 
+    if side == 'closelong':
+        side = 'sell'
+    elif side == 'closeshort':
+        side = 'buy'
+
     if data['exchange'] == 'binance-futures':
         if use_binance_futures:
             response, status_code = create_order_binance(data, exchange)
