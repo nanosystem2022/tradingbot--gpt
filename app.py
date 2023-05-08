@@ -11,9 +11,24 @@ with open('config.json') as config_file:
     config = json.load(config_file)
 
 def is_exchange_enabled(exchange_name):
-    return config['EXCHANGES'].get(exchange_name, {}).get('ENABLED', False)
+    if exchange_name in config['EXCHANGES']:
+        if config['EXCHANGES'][exchange_name]['ENABLED']:
+            return True
+    return False
 
 user_trade_status = {}
+
+def update_user_trade_status(data, response):
+    symbol = data['symbol']
+    side = data['side']
+
+    if response['status'] == 'success':
+        if side == 'closelong':
+            user_trade_status[symbol] = 'sell'
+        elif side == 'closeshort':
+            user_trade_status[symbol] = 'buy'
+        else:
+            user_trade_status[symbol] = side
 
 def create_order_binance(data, exchange):
     symbol = data['symbol']
@@ -36,6 +51,7 @@ def create_order_binance(data, exchange):
             amount=float(quantity),
             price=price
         )
+        user_trade_status[symbol] = side
         return {
             "status": "success",
             "data": order
@@ -68,6 +84,7 @@ def create_order_bybit(data, session):
             'price': price,
             'time_in_force': 'GTC'
         })
+        user_trade_status[symbol] = side
         return {
             "status": "success",
             "data": order.json()
@@ -134,11 +151,11 @@ def webhook():
             return {"status": "error", "message": "Cannot close long because there is no open long position."}, 400
         if side == 'closeshort' and user_trade_status[symbol] != 'sell':
             return {"status": "error", "message": "Cannot close short because there is no open short position."}, 400
-
+ 
     if data['exchange'] == 'binance-futures':
         if use_binance_futures:
             response, status_code = create_order_binance(data, exchange)
-            user_trade_status[symbol] = side
+            update_user_trade_status(data, response)
             return jsonify(response), status_code
         else:
             error_message = "Binance Futures is not enabled in the config file."
@@ -150,7 +167,7 @@ def webhook():
     elif data['exchange'] == 'bybit':
         if use_bybit:
             response, status_code = create_order_bybit(data, session)
-            user_trade_status[symbol] = side
+            update_user_trade_status(data, response)
             return jsonify(response), status_code
         else:
             error_message = "Bybit is not enabled in the config file."
