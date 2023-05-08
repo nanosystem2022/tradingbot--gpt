@@ -1,18 +1,14 @@
 import json
-from flask import Flask, jsonify, request
+from flask import Flask, render_template, request, jsonify
+import time
 import ccxt
 from custom_http import HTTP
-import traceback
 
 app = Flask(__name__)
 
-# Load config.json
+# load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
-
-open_trade = False
-open_trade_id = None
-
 
 def is_exchange_enabled(exchange_name):
     if exchange_name in config['EXCHANGES']:
@@ -20,32 +16,20 @@ def is_exchange_enabled(exchange_name):
             return True
     return False
 
-
-def validate_input_data(data):
-    required_fields = ['symbol', 'side', 'type']
-
-    for field in required_fields:
-        if field not in data:
-            return False, f"The '{field}' field is missing in the input data."
-
-    if 'quantity' not in data or not data['quantity']:
-        return False, "The 'quantity' field is missing or empty in the input data."
-
-    return True, None
-
+user_trade_status = {}
 
 def create_order_binance(data, exchange):
-    validation_status, error_message = validate_input_data(data)
-    if not validation_status:
-        return {
-            "status": "error",
-            "message": error_message
-        }, 400
-
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
     quantity = data.get('quantity')
+
+    if quantity is None:
+        error_message = "The 'quantity' field is missing in the input data."
+        return {
+            "status": "error",
+            "message": error_message
+        }, 400
 
     try:
         order = exchange.create_order(
@@ -55,6 +39,7 @@ def create_order_binance(data, exchange):
             amount=float(quantity),
             price=price
         )
+        user_trade_status[symbol] = side
         return {
             "status": "success",
             "data": order
@@ -62,23 +47,21 @@ def create_order_binance(data, exchange):
     except Exception as e:
         return {
             "status": "error",
-            "message": f"An error occurred: {str(e)}",
-            "traceback": traceback.format_exc()
+            "message": str(e)
         }, 500
 
-
 def create_order_bybit(data, session):
-    validation_status, error_message = validate_input_data(data)
-    if not validation_status:
-        return {
-            "status": "error",
-            "message": error_message
-        }, 400
-
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
     quantity = data.get('quantity')
+
+    if quantity is None:
+        error_message = "The 'quantity' field is missing in the input data."
+        return {
+            "status": "error",
+            "message": error_message
+        }, 400
 
     try:
         order = session.post('/v2/private/order/create', json={
@@ -89,6 +72,7 @@ def create_order_bybit(data, session):
             'price': price,
             'time_in_force': 'GTC'
         })
+        user_trade_status[symbol] = side
         return {
             "status": "success",
             "data": order.json()
@@ -96,48 +80,7 @@ def create_order_bybit(data, session):
     except Exception as e:
         return {
             "status": "error",
-            "message": f"An error occurred: {str(e)}",
-            "traceback": traceback.format_exc()
-        }, 500
-
-def close_order_binance(symbol, side, remaining, exchange):
-    try:
-        order = exchange.create_order(
-            symbol=symbol,
-            type='market',
-            side=side,
-            amount=remaining
-        )
-        return {
-            "status": "success",
-            "data": order
-        }, 200
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"An error occurred: {str(e)}",
-            "traceback": traceback.format_exc()
-        }, 500
-
-
-def close_order_bybit(symbol, side, remaining, session):
-    try:
-        order = session.post('/v2/private/order/create', json={
-            'symbol': symbol,
-            'side': side,
-            'order_type': 'Market',
-            'qty': remaining,
-            'time_in_force': 'GTC'
-        })
-        return {
-            "status": "success",
-            "data": order.json()
-        }, 200
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"An error occurred: {str(e)}",
-            "traceback": traceback.format_exc()
+            "message": str(e)
         }, 500
 
 use_bybit = is_exchange_enabled('BYBIT')
@@ -176,7 +119,6 @@ def index():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    global open_trade, open_trade_id
     print("Hook Received!")
     data = json.loads(request.data)
     print(data)
@@ -189,75 +131,39 @@ def webhook():
             "message": error_message
         }, 400
 
-    # Handle close trade requests
-    if data.get('action') in ['closeshort', 'closelong']:
-        close_trade_handlers = {
-            'binance-futures': (use_binance_futures, close_order_binance),
-            'bybit': (use_bybit, close_order_bybit)
-        }
+    symbol = data['symbol']
+    side = data['side']
 
-        if data['exchange'] in close_trade_handlers:
-            enabled, handler = close_trade_handlers[data['exchange']]
-            if enabled:
-                if data['action'] == 'closeshort':
-                    side = 'buy'
-                else:
-                    side = 'sell'
+    if symbol in user_trade_status:
+        if side == 'closelong' and user_trade_status[symbol] != 'buy':
+            return {"status": "error", "message": "Cannot close long because there is no open long position."}, 400
+        if side == 'closeshort' and user_trade_status[symbol] != 'sell':
+            return {"status": "error", "message": "Cannot close short because there is no open short position."}, 400
 
-                order = exchange.fetch_order(id=open_trade_id, symbol=data['symbol'])
-                response, status_code = handler(
-                    data['symbol'],
-                    side,
-                    order['remaining'],
-                    exchange if data['exchange'] == 'binance-futures' else session
-                )
-
-                open_trade = False
-                open_trade_id = None
-                return jsonify(response), status_code
-            else:
-                error_message = f"{data['exchange']} is not enabled in the config file."
-                return {
-                    "status": "error",
-                    "message": error_message
-                }, 400
+    if data['exchange'] == 'binance-futures':
+        if use_binance_futures:
+            response, status_code = create_order_binance(data, exchange)
+            return jsonify(response), status_code
         else:
-            error_message = "Unsupported exchange."
+            error_message = "Binance Futures is not enabled in the config file."
             return {
                 "status": "error",
                 "message": error_message
             }, 400
 
-    # Handle open trade requests
-    elif not open_trade:
-        open_trade_handlers = {
-            'binance-futures': (use_binance_futures, create_order_binance),
-            'bybit': (use_bybit, create_order_bybit)
-        }
-
-        if data['exchange'] in open_trade_handlers:
-            enabled, handler = open_trade_handlers[data['exchange']]
-            if enabled:
-                response, status_code = handler(data, exchange if data['exchange'] == 'binance-futures' else session)
-                if status_code == 200:
-                    open_trade = True
-                    open_trade_id = response['data']['id']
-                return jsonify(response), status_code
-            else:
-                error_message = f"{data['exchange']} is not enabled in the config file."
-                return {
-                    "status": "error",
-                    "message": error_message
-                }, 400
+    elif data['exchange'] == 'bybit':
+        if use_bybit:
+            response, status_code = create_order_bybit(data, session)
+            return jsonify(response), status_code
         else:
-            error_message = "Unsupported exchange."
+            error_message = "Bybit is not enabled in the config file."
             return {
                 "status": "error",
                 "message": error_message
             }, 400
+
     else:
-        # Reject new trades while a trade is open
-        error_message = "A trade is already open. Please close the current trade before opening a new one."
+        error_message = "Unsupported exchange."
         return {
             "status": "error",
             "message": error_message
@@ -265,4 +171,3 @@ def webhook():
 
 if __name__ == '__main__':
     app.run()
-
