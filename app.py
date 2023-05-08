@@ -1,11 +1,13 @@
 import json
-from flask import Flask, request, jsonify
+import logging
+from flask import Flask, render_template, request, jsonify
+import time
 import ccxt
 from custom_http import HTTP
-import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
 
 # load config.json
 with open('config.json') as config_file:
