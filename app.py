@@ -1,11 +1,8 @@
 import json
-import logging
 from flask import Flask, render_template, request, jsonify
 import time
 import ccxt
 from custom_http import HTTP
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
 
@@ -13,8 +10,7 @@ app = Flask(__name__)
 with open('config.json') as config_file:
     config = json.load(config_file)
 
-# Add a global variable to store the status of an open position
-open_position = False
+current_position = None
 
 def is_exchange_enabled(exchange_name):
     if exchange_name in config['EXCHANGES']:
@@ -85,6 +81,20 @@ def create_order_bybit(data, session):
             "message": str(e)
         }, 500
 
+def process_webhook(data):
+    global current_position
+    if current_position is None:
+        if data['side'] == 'buy' or data['side'] == 'sell':
+            current_position = data['side']
+            return True
+    elif current_position == 'buy' and data['side'] == 'closelong':
+        current_position = None
+        return True
+    elif current_position == 'sell' and data['side'] == 'closeshort':
+        current_position = None
+        return True
+    return False
+
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
 
@@ -121,11 +131,9 @@ def index():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    global open_position
-
-    logging.info("Hook Received!")
+    print("Hook Received!")
     data = json.loads(request.data)
-    logging.info(data)
+    print(data)
 
     if int(data['key']) != config['KEY']:
         error_message = "Invalid Key, Please Try Again!"
@@ -135,43 +143,33 @@ def webhook():
             "message": error_message
         }, 400
 
+    if not process_webhook(data):
+        return {
+            "status": "error",
+            "message": "Position not allowed."
+        }, 400
+
     if data['exchange'] == 'binance-futures':
         if use_binance_futures:
-            if data['side'] in ['long', 'short'] and not open_position:
-                response, status_code = create_order_binance(data, exchange)
-                if response['status'] == 'success':
-                    open_position = True
-                return jsonify(response), status_code
-            elif data['side'] in ['closelong', 'closeshort'] and open_position:
-                response, status_code = create_order_binance(data, exchange)
-                if response['status'] == 'success':
-                    open_position = False
-                return jsonify(response), status_code
-            else:
-                error_message = "Cannot open new position while an existing one is open or close a position when there is none."
-                return {
-                    "status": "error",
-                    "message": error_message
-                }, 400
+            response, status_code = create_order_binance(data, exchange)
+            return jsonify(response), status_code
+        else:
+            error_message = "Binance Futures is not enabled in the config file."
+            return {
+                "status": "error",
+                "message": error_message
+            }, 400
 
     elif data['exchange'] == 'bybit':
         if use_bybit:
-            if data['side'] in ['long', 'short'] and not open_position:
-                response, status_code = create_order_bybit(data, session)
-                if response['status'] == 'success':
-                    open_position = True
-                return jsonify(response), status_code
-            elif data['side'] in ['closelong', 'closeshort'] and open_position:
-                response, status_code = create_order_bybit(data, session)
-                if response['status'] == 'success':
-                    open_position = False
-                return jsonify(response), status_code
-            else:
-                error_message = "Cannot open new position while an existing one is open or close a position when there is none."
-                return {
-                    "status": "error",
-                    "message": error_message
-                }, 400
+            response, status_code = create_order_bybit(data, session)
+            return jsonify(response), status_code
+        else:
+            error_message = "Bybit is not enabled in the config file."
+            return {
+                "status": "error",
+                "message": error_message
+            }, 400
 
     else:
         error_message = "Unsupported exchange."
