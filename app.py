@@ -18,6 +18,20 @@ def is_exchange_enabled(exchange_name):
 
 user_trade_status = {}
 
+def update_user_trade_status(data, response):
+    if response['status'] == 'error':
+        return
+    side = data['side']
+    symbol = data['symbol']
+    if side.lower() == 'buy':
+        user_trade_status[symbol] = 'buy'
+    elif side.lower() == 'sell':
+        user_trade_status[symbol] = 'sell'
+    elif side.lower() == 'closelong':
+        user_trade_status[symbol] = None
+    elif side.lower() == 'closeshort':
+        user_trade_status[symbol] = None
+
 def create_order_binance(data, exchange):
     symbol = data['symbol']
     side = data['side']
@@ -143,6 +157,7 @@ def webhook():
     if data['exchange'] == 'binance-futures':
         if use_binance_futures:
             response, status_code = create_order_binance(data, exchange)
+            update_user_trade_status(data, response)
             return jsonify(response), status_code
         else:
             error_message = "Binance Futures is not enabled in the config file."
@@ -154,6 +169,7 @@ def webhook():
     elif data['exchange'] == 'bybit':
         if use_bybit:
             response, status_code = create_order_bybit(data, session)
+            update_user_trade_status(data, response)
             return jsonify(response), status_code
         else:
             error_message = "Bybit is not enabled in the config file."
