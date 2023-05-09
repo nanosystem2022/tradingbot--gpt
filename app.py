@@ -42,29 +42,22 @@ def create_order_binance(data):
         return {'error': 'Missing side or quantity'}, 400
 
     try:
-        order = exchange.create_order(symbol, order_type, side, quantity)
+        if data['action'] == 'open':
+            order = exchange.create_order(symbol, order_type, side, quantity)
+        elif data['action'] == 'closelong' or data['action'] == 'closeshort':
+            position = exchange.fetch_positions({'symbol': symbol})
+            if position:
+                quantity_to_close = position[0]['contracts'] if data['action'] == 'closelong' else position[1]['contracts']
+                order = exchange.create_order(symbol, order_type, side, quantity_to_close)
+            else:
+                return {'error': 'No open position found'}, 400
+        else:
+            return {'error': 'Invalid action'}, 400
+
         return {'result': order}, 200
     except Exception as e:
         return {'error': str(e)}, 400
 
-
-    try:
-        order = exchange.create_order(
-            symbol=symbol,
-            type=data['type'],
-            side=side,
-            amount=float(quantity),
-            price=price
-        )
-        return {
-            "status": "success",
-            "data": order
-        }, 200
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }, 500
 
 def create_order_bybit(data, session):
     symbol = data['symbol']
