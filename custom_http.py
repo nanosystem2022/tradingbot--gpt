@@ -1,6 +1,7 @@
 import hmac
 import time
 from requests import Session
+import http.client as http_status
 
 class HTTP(Session):
     def __init__(self, endpoint, api_key, api_secret):
