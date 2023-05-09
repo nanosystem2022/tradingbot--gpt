@@ -10,7 +10,8 @@ app = Flask(__name__)
 with open('config.json') as config_file:
     config = json.load(config_file)
 
-current_position = None
+# Add a variable to track open orders
+open_orders = {}
 
 def is_exchange_enabled(exchange_name):
     if exchange_name in config['EXCHANGES']:
@@ -80,20 +81,29 @@ def create_order_bybit(data, session):
             "status": "error",
             "message": str(e)
         }, 500
+    
+def close_order_binance(data, exchange):
+    order_id = open_orders.get(data['symbol'])
+    if order_id:
+        try:
+            order = exchange.cancel_order(order_id, symbol=data['symbol'])
+            return {"status": "success", "data": order}, 200
+        except Exception as e:
+            return {"status": "error", "message": str(e)}, 500
+    else:
+        return {"status": "error", "message": "No open order found."}, 400
 
-def process_webhook(data):
-    global current_position
-    if current_position is None:
-        if data['side'] == 'buy' or data['side'] == 'sell':
-            current_position = data['side']
-            return True
-    elif current_position == 'buy' and data['side'] == 'closelong':
-        current_position = None
-        return True
-    elif current_position == 'sell' and data['side'] == 'closeshort':
-        current_position = None
-        return True
-    return False
+def close_order_bybit(data, session):
+    order_id = open_orders.get(data['symbol'])
+    if order_id:
+        try:
+            order = session.post('/v2/private/order/cancel', json={'order_id': order_id})
+            return {"status": "success", "data": order.json()}, 200
+        except Exception as e:
+            return {"status": "error", "message": str(e)}, 500
+    else:
+        return {"status": "error", "message": "No open order found."}, 400
+
 
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
@@ -131,45 +141,35 @@ def index():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    print("Hook Received!")
-    data = json.loads(request.data)
-    print(data)
-
-    if int(data['key']) != config['KEY']:
-        error_message = "Invalid Key, Please Try Again!"
-        print(error_message)
-        return {
-            "status": "error",
-            "message": error_message
-        }, 400
-
-    if not process_webhook(data):
-        return {
-            "status": "error",
-            "message": "Position not allowed."
-        }, 400
+    # ... your previous code ...
 
     if data['exchange'] == 'binance-futures':
-        if use_binance_futures:
+        if data['action'] == 'close':
+            response, status_code = close_order_binance(data, exchange)
+            return jsonify(response), status_code
+        elif data['action'] == 'open':
             response, status_code = create_order_binance(data, exchange)
+            if status_code == 200:
+                open_orders[data['symbol']] = response['data']['orderId']
             return jsonify(response), status_code
         else:
-            error_message = "Binance Futures is not enabled in the config file."
-            return {
-                "status": "error",
-                "message": error_message
-            }, 400
+            error_message = "Unsupported action."
+            return {"status": "error", "message": error_message}, 400
+
+    # ... your previous code ...
 
     elif data['exchange'] == 'bybit':
-        if use_bybit:
+        if data['action'] == 'close':
+            response, status_code = close_order_bybit(data, session)
+            return jsonify(response), status_code
+        elif data['action'] == 'open':
             response, status_code = create_order_bybit(data, session)
+            if status_code == 200:
+                open_orders[data['symbol']] = response['data']['order_id']
             return jsonify(response), status_code
         else:
-            error_message = "Bybit is not enabled in the config file."
-            return {
-                "status": "error",
-                "message": error_message
-            }, 400
+            error_message = "Unsupported action."
+            return {"status": "error", "message": error_message}, 400
 
     else:
         error_message = "Unsupported exchange."
