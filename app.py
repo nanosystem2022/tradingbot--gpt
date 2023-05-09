@@ -1,4 +1,5 @@
 import json
+import http
 from flask import Flask, render_template, request, jsonify
 import time
 import ccxt
@@ -6,12 +7,19 @@ from custom_http import HTTP
 
 app = Flask(__name__)
 
-# load config.json
+# Load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
 
 # Add a variable to track open orders
 open_orders = {}
+
+# Error messages
+ERR_UNSUPPORTED_ACTION = {"status": "error", "message": "Unsupported action."}
+ERR_UNSUPPORTED_EXCHANGE = {"status": "error", "message": "Unsupported exchange."}
+ERR_MISSING_QUANTITY = {"status": "error", "message": "The 'quantity' field is missing in the input data."}
+ERR_NO_OPEN_ORDER = {"status": "error", "message": "No open order found."}
+
 
 def is_exchange_enabled(exchange_name):
     if exchange_name in config['EXCHANGES']:
@@ -145,40 +153,27 @@ def webhook():
     data = request.json
     print(data)
 
-    if data['exchange'] == 'binance-futures':
-        if data['action'] == 'close':
-            response, status_code = close_order_binance(data, exchange)
-            return jsonify(response), status_code
-        elif data['action'] == 'open':
-            response, status_code = create_order_binance(data, exchange)
-            if status_code == 200:
-                open_orders[data['symbol']] = response['data']['orderId']
+    actions = {
+        'binance-futures': {
+            'open': create_order_binance,
+            'close': close_order_binance
+        },
+        'bybit': {
+            'open': create_order_bybit,
+            'close': close_order_bybit
+        }
+    }
+
+    exchange_actions = actions.get(data['exchange'])
+    if exchange_actions:
+        action = exchange_actions.get(data['action'])
+        if action:
+            response, status_code = action(data, exchange if data['exchange'] == 'binance-futures' else session)
             return jsonify(response), status_code
         else:
-            error_message = "Unsupported action."
-            return {"status": "error", "message": error_message}, 400
-
-    # ... your previous code ...
-
-    elif data['exchange'] == 'bybit':
-        if data['action'] == 'close':
-            response, status_code = close_order_bybit(data, session)
-            return jsonify(response), status_code
-        elif data['action'] == 'open':
-            response, status_code = create_order_bybit(data, session)
-            if status_code == 200:
-                open_orders[data['symbol']] = response['data']['order_id']
-            return jsonify(response), status_code
-        else:
-            error_message = "Unsupported action."
-            return {"status": "error", "message": error_message}, 400
-
+            return jsonify(ERR_UNSUPPORTED_ACTION), http.HTTPStatus.BAD_REQUEST
     else:
-        error_message = "Unsupported exchange."
-        return {
-            "status": "error",
-            "message": error_message
-        }, 400
+        return jsonify(ERR_UNSUPPORTED_EXCHANGE), http.HTTPStatus.BAD_REQUEST
 
 if __name__ == '__main__':
     app.run()
