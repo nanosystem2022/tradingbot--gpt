@@ -193,6 +193,7 @@ if use_binance_futures:
 def index():
     return {'message': 'Server is running!'}
 
+# Update the 'webhook' route to handle close orders
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position
@@ -208,17 +209,11 @@ def webhook():
             "message": error_message
         }, 400
 
-    if data['side'] in ['closelong', 'closeshort'] or current_position == 'closed':
+    if data['side'] in ['closelong', 'closeshort']:
         if data['exchange'] == 'binance-futures':
             if use_binance_futures:
-                if data['side'] in ['closelong', 'closeshort']:
-                    response, status_code = close_order_binance(data, exchange)
-                else:
-                    response, status_code = create_order_binance(data, exchange)
-                if data['side'] == 'long' or data['side'] == 'short':
-                    current_position = data['side']
-                elif data['side'] in ['closelong', 'closeshort']:
-                    current_position = 'closed'
+                response, status_code = close_order_binance(data, exchange)
+                current_position = 'closed'
                 return jsonify(response), status_code
             else:
                 error_message = "Binance Futures is not enabled in the config file."
@@ -229,14 +224,42 @@ def webhook():
 
         elif data['exchange'] == 'bybit':
             if use_bybit:
-                if data['side'] in ['closelong', 'closeshort']:
-                    response, status_code = close_order_bybit(data, session)
-                else:
-                    response, status_code = create_order_bybit(data, session)
+                response, status_code = close_order_bybit(data, session)
+                current_position = 'closed'
+                return jsonify(response), status_code
+            else:
+                error_message = "Bybit is not enabled in the config file."
+                return {
+                    "status": "error",
+                    "message": error_message
+                }, 400
+
+        else:
+            error_message = "Unsupported exchange."
+            return {
+                "status": "error",
+                "message": error_message
+            }, 400
+
+    elif current_position == 'closed':
+        if data['exchange'] == 'binance-futures':
+            if use_binance_futures:
+                response, status_code = create_order_binance(data, exchange)
                 if data['side'] == 'long' or data['side'] == 'short':
                     current_position = data['side']
-                elif data['side'] in ['closelong', 'closeshort']:
-                    current_position = 'closed'
+                return jsonify(response), status_code
+            else:
+                error_message = "Binance Futures is not enabled in the config file."
+                return {
+                    "status": "error",
+                    "message": error_message
+                }, 400
+
+        elif data['exchange'] == 'bybit':
+            if use_bybit:
+                response, status_code = create_order_bybit(data, session)
+                if data['side'] == 'long' or data['side'] == 'short':
+                    current_position = data['side']
                 return jsonify(response), status_code
             else:
                 error_message = "Bybit is not enabled in the config file."
