@@ -19,35 +19,29 @@ def is_exchange_enabled(exchange_name):
     return False
 
 def create_order_binance(data, exchange):
-    symbol = data['symbol']
-    side = data['side']
-    price = data.get('price', 0)
-    quantity = data.get('quantity')
-
-    if quantity is None:
-        error_message = "The 'quantity' field is missing in the input data."
-        return {
-            "status": "error",
-            "message": error_message
-        }, 400
-
     try:
-        order = exchange.create_order(
-            symbol=symbol,
-            type=data['type'],
-            side=side,
-            amount=float(quantity),
-            price=price
-        )
-        return {
-            "status": "success",
-            "data": order
-        }, 200
+        symbol = data['symbol']
+        order_type = data['type']
+        side = data['side']
+        quantity = data['quantity']
+
+        if side == "closelong":
+            side = "sell"
+        elif side == "closeshort":
+            side = "buy"
+
+        if order_type == "market":
+            order = exchange.create_market_order(symbol, side, quantity)
+        elif order_type == "limit":
+            price = data['price']
+            order = exchange.create_limit_order(symbol, side, quantity, price)
+        else:
+            return {"status": "error", "message": "Invalid order type"}, 400
+
+        return {"status": "success", "data": order}, 200
     except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }, 500
+        return {"status": "error", "message": f"Error creating order: {str(e)}"}, 500
+
 
 def create_order_bybit(data, session):
     symbol = data['symbol']
