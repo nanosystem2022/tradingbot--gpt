@@ -141,7 +141,9 @@ def index():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # ... your previous code ...
+    print("Hook Received!")
+    data = request.json
+    print(data)
 
     if data['exchange'] == 'binance-futures':
         if data['action'] == 'close':
