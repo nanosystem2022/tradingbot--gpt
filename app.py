@@ -83,8 +83,118 @@ def create_order_bybit(data, session):
             "status": "error",
             "message": str(e)
         }, 500
+    
+def close_order_binance(data, exchange):
+    symbol = data['symbol']
+    side = data['side']
+    price = data.get('price', 0)
+    quantity = data.get('quantity')
 
-# Other code remains the same
+    if side not in ['closelong', 'closeshort']:
+        error_message = "Invalid side value for closing order. Use 'closelong' or 'closeshort'."
+        return {
+            "status": "error",
+            "message": error_message
+        }, 400
+
+    if quantity is None:
+        error_message = "The 'quantity' field is missing in the input data."
+        return {
+            "status": "error",
+            "message": error_message
+        }, 400
+
+    try:
+        order = exchange.create_order(
+            symbol=symbol,
+            type=data['type'],
+            side='sell' if side == 'closelong' else 'buy',
+            amount=float(quantity),
+            price=price
+        )
+        return {
+            "status": "success",
+            "data": order
+        }, 200
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+def close_order_bybit(data, session):
+    symbol = data['symbol']
+    side = data['side']
+    price = data.get('price', 0)
+    quantity = data.get('quantity')
+
+    if side not in ['closelong', 'closeshort']:
+        error_message = "Invalid side value for closing order. Use 'closelong' or 'closeshort'."
+        return {
+            "status": "error",
+            "message": error_message
+        }, 400
+
+    if quantity is None:
+        error_message = "The 'quantity' field is missing in the input data."
+        return {
+            "status": "error",
+            "message": error_message
+        }, 400
+
+    try:
+        order = session.post('/v2/private/order/create', json={
+            'symbol': symbol,
+            'side': 'sell' if side == 'closelong' else 'buy',
+            'order_type': data['type'],
+            'qty': float(quantity),
+            'price': price,
+            'time_in_force': 'GTC'
+        })
+        return {
+            "status": "success",
+            "data": order.json()
+        }, 200
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+use_bybit = is_exchange_enabled('BYBIT')
+use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
+
+if use_bybit:
+    print("Bybit is enabled!")
+    session = HTTP(
+        endpoint='https://api.bybit.com',
+        api_key=config['EXCHANGES']['BYBIT']['API_KEY'],
+        api_secret=config['EXCHANGES']['BYBIT']['API_SECRET']
+    )
+
+if use_binance_futures:
+    print("Binance is enabled!")
+    exchange = ccxt.binance({
+        'apiKey': config['EXCHANGES']['BINANCE-FUTURES']['API_KEY'],
+        'secret': config['EXCHANGES']['BINANCE-FUTURES']['API_SECRET'],
+        'options': {
+            'defaultType': 'future',
+        },
+        'urls': {
+            'api': {
+                'public': 'https://testnet.binancefuture.com/fapi/v1',
+                'private': 'https://testnet.binancefuture.com/fapi/v1',
+            },
+       
+        }
+    })
+
+    if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
+        exchange.set_sandbox_mode(True)
+
+@app.route('/')
+def index():
+    return {'message': 'Server is running!'}
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
