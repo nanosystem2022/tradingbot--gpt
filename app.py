@@ -27,18 +27,26 @@ def is_exchange_enabled(exchange_name):
             return True
     return False
 
-def create_order_binance(data, exchange):
-    symbol = data['symbol']
-    side = data['side']
-    price = data.get('price', 0)
-    quantity = data.get('quantity')
+def create_order_binance(data):
+    symbol = data['symbol'].replace('/', '')
+    order_type = data.get('type', 'market')
+    side = data.get('side', None)
+    quantity = data.get('quantity', None)
 
-    if quantity is None:
-        error_message = "The 'quantity' field is missing in the input data."
-        return {
-            "status": "error",
-            "message": error_message
-        }, 400
+    if data['action'] == 'closelong':
+        side = 'sell'
+    elif data['action'] == 'closeshort':
+        side = 'buy'
+
+    if side is None or quantity is None:
+        return {'error': 'Missing side or quantity'}, 400
+
+    try:
+        order = exchange.create_order(symbol, order_type, side, quantity)
+        return {'result': order}, 200
+    except Exception as e:
+        return {'error': str(e)}, 400
+
 
     try:
         order = exchange.create_order(
