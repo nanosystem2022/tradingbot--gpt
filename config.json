@@ -7,8 +7,8 @@
               "ENABLED": false
          },
          "BINANCE-FUTURES": {
-              "API_KEY": "18cdb3cc1757b7e14d678009713ab9506257dd28366bc9852df83ed46c89f135",
-              "API_SECRET": "d45b531786836d30a2fd35ea5f5ec8a564cfb6c1baa768ebb4be01cab004c745",
+              "API_KEY": "f6a92fc87d837f3294007e20d28e2466d4244514d39949be22aec0d01649c7d1",
+              "API_SECRET": "d31e0866187e4773fef0d6ee2f90f0e9307f4440aae058833c945f1ecd085f37",
               "ENABLED": true,
               "TESTNET": true
          }
