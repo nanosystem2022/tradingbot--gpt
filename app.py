@@ -193,7 +193,6 @@ if use_binance_futures:
 def index():
     return {'message': 'Server is running!'}
 
-# Update the 'webhook' route to handle close orders
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position
@@ -209,39 +208,8 @@ def webhook():
             "message": error_message
         }, 400
 
-    if data['side'] in ['closelong', 'closeshort']:
-        if data['exchange'] == 'binance-futures':
-            if use_binance_futures:
-                response, status_code = close_order_binance(data, exchange)
-                current_position = 'closed'
-                return jsonify(response), status_code
-            else:
-                error_message = "Binance Futures is not enabled in the config file."
-                return {
-                    "status": "error",
-                    "message": error_message
-                }, 400
-
-        elif data['exchange'] == 'bybit':
-            if use_bybit:
-                response, status_code = close_order_bybit(data, session)
-                current_position = 'closed'
-                return jsonify(response), status_code
-            else:
-                error_message = "Bybit is not enabled in the config file."
-                return {
-                    "status": "error",
-                    "message": error_message
-                }, 400
-
-        else:
-            error_message = "Unsupported exchange."
-            return {
-                "status": "error",
-                "message": error_message
-            }, 400
-
-    elif current_position == 'closed':
+    close_order = data['side'] == 'closelong' or data['side'] == 'closeshort'
+    if current_position == 'closed' or close_order:
         if data['exchange'] == 'binance-futures':
             if use_binance_futures:
                 response, status_code = create_order_binance(data, exchange)
@@ -274,6 +242,10 @@ def webhook():
                 "status": "error",
                 "message": error_message
             }, 400
+
+        if close_order:
+            current_position = 'closed'
+
     else:
         error_message = "Cannot accept new orders until current position is closed."
         return {
