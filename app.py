@@ -209,11 +209,6 @@ if use_binance_futures:
 def index():
     return {'message': 'Server is running!'}
 
-@app.route('/')
-def index():
-    return {'message': 'Server is running!'}
-
-
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position
