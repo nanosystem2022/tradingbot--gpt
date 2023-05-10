@@ -1,12 +1,12 @@
+from flask import Flask, jsonify, request
 import json
-from flask import Flask, render_template, request, jsonify
 import time
 import ccxt
 from custom_http import HTTP
 
 app = Flask(__name__)
 
-# load config.json
+# Load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
 
@@ -202,46 +202,42 @@ def webhook():
             "message": error_message
         }, 400
 
-    close_order = data['side'] == 'closelong' or data['side'] == 'closeshort'
-    if current_position == 'closed' or close_order:
-        if data['exchange'] == 'binance-futures':
-            if use_binance_futures:
-                response, status_code = create_order_binance(data, exchange)
-                if data['side'] == 'long' or data['side'] == 'short':
-                    current_position = data['side']
-                return jsonify(response), status_code
+    if data['side'] in ['closelong', 'closeshort']:
+        if current_position != 'closed':
+            # Close the current position
+            if data['exchange'] == 'binance-futures':
+                response, status_code = close_order_binance(data, exchange)
+            elif data['exchange'] == 'bybit':
+                response, status_code = close_order_bybit(data, session)
             else:
-                error_message = "Binance Futures is not enabled in the config file."
+                error_message = "Unsupported exchange."
                 return {
                     "status": "error",
                     "message": error_message
                 }, 400
 
-        elif data['exchange'] == 'bybit':
-            if use_bybit:
-                response, status_code = create_order_bybit(data, session)
-                if data['side'] == 'long' or data['side'] == 'short':
-                    current_position = data['side']
-                return jsonify(response), status_code
-            else:
-                error_message = "Bybit is not enabled in the config file."
-                return {
-                    "status": "error",
-                    "message": error_message
-                }, 400
-
-        else:
-            error_message = "Unsupported exchange."
-            return {
-                "status": "error",
-                "message": error_message
-            }, 400
-
-        if close_order:
             current_position = 'closed'
+            return jsonify(response), status_code
+
+    elif data['side'] in ['long', 'short']:
+        if current_position == 'closed':
+            # Open a new position
+            if data['exchange'] == 'binance-futures':
+                response, status_code = create_order_binance(data, exchange)
+            elif data['exchange'] == 'bybit':
+                response, status_code = create_order_bybit(data, session)
+            else:
+                error_message = "Unsupported exchange."
+                return {
+                    "status": "error",
+                    "message": error_message
+                }, 400
+
+            current_position = data['side']
+            return jsonify(response), status_code
 
     else:
-        error_message = "Cannot accept new orders until current position is closed."
+        error_message = "Invalid side value. Use 'long', 'short', 'closelong', or 'closeshort'."
         return {
             "status": "error",
             "message": error_message
