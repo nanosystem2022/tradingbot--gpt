@@ -25,12 +25,10 @@ def create_order_binance(data, exchange):
         side = data['side']
         quantity = data['quantity']
 
-        if side == "closelong" and current_position == "long":
+        if side == "closelong":
             side = "sell"
-        elif side == "closeshort" and current_position == "short":
+        elif side == "closeshort":
             side = "buy"
-        else:
-            return {"status": "error", "message": "Invalid side or position state."}, 400
 
         if order_type == "market":
             order = exchange.create_market_order(symbol, side, quantity)
@@ -59,13 +57,6 @@ def create_order_bybit(data, session):
         }, 400
 
     try:
-        if side == "closelong" and current_position == "long":
-            side = "sell"
-        elif side == "closeshort" and current_position == "short":
-            side = "buy"
-        else:
-            return {"status": "error", "message": "Invalid side or position state."}, 400
-
         order = session.post('/v2/private/order/create', json={
             'symbol': symbol,
             'side': side,
@@ -83,7 +74,7 @@ def create_order_bybit(data, session):
             "status": "error",
             "message": str(e)
         }, 500
-    
+
 def close_order_binance(data, exchange):
     symbol = data['symbol']
     side = data['side']
