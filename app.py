@@ -121,10 +121,7 @@ if use_binance:
         'secret': config['EXCHANGES']['binance']['SECRET']
     })
 
-@app.route('/create_order', methods=['POST'])
-def create_order():
-    data = request.json
-
+def create_order(data):
     if use_bybit:
         response, status = create_order_bybit(data, session_bybit)
         if status == 200:
@@ -136,9 +133,7 @@ def create_order():
 
     return jsonify(response), status
 
-@app.route('/close_order', methods=['POST'])
-def close_order():
-    data = request.json
+def close_order(data):
     symbol = data['symbol']
 
     if symbol not in active_orders:
@@ -156,6 +151,27 @@ def close_order():
         del active_orders[symbol]
 
     return jsonify(response), status
+
+@app.route('/webhook', methods=['POST'])
+def handle_webhook():
+    data = request.json
+
+    side = data.get('side')
+    if side is None:
+        return jsonify({
+            "status": "error",
+            "message": "The 'side' field is missing in the input data."
+        }), 400
+
+    if side in ['buy', 'sell']:
+        return create_order(data)
+    elif side in ['closeshort', 'closelong']:
+        return close_order(data)
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "The 'side' field must be either 'buy', 'sell', 'closeshort' or 'closelong'."
+        }), 400
 
 if __name__ == '__main__':
     app.run(port=5000)
