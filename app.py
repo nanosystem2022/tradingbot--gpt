@@ -147,6 +147,18 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
+@app.route('/balance', methods=['GET'])
+def get_balance():
+    balance = {}
+    if use_bybit:
+        bybit_balance = session.fetch_balance()
+        balance['bybit'] = bybit_balance['total']
+    if use_binance_futures:
+        binance_balance = exchange.fetch_balance()
+        balance['binance'] = binance_balance['total']
+    return balance
+
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position, current_side
