@@ -151,7 +151,7 @@ def webhook():
                 if data['side'] in ['buy', 'sell']:
                     response = create_order_binance(data, exchange)
                     current_position = data['side']
-                elif data['side'] in ['closelong', 'closeshort']:
+                elif data['side'] in ['closelong', 'closeshort'] and current_position != 'closed':
                     response = close_order_binance(data, exchange)
                     current_position = 'closed'
                 else:
@@ -165,7 +165,7 @@ def webhook():
                 if data['side'] in ['buy', 'sell']:
                     response = create_order_bybit(data, session)
                     current_position = data['side']
-                elif data['side'] in ['closelong', 'closeshort']:
+                elif data['side'] in ['closelong', 'closeshort'] and current_position != 'closed':
                     response = close_order_bybit(data, session)
                     current_position = 'closed'
                 else:
@@ -181,7 +181,6 @@ def webhook():
         return {"status": "error", "message": str(e)}, 400
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
-
 
 
 if __name__ == '__main__':
