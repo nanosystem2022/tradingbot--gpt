@@ -1,33 +1,35 @@
-import time
 import hmac
-import requests
-from urllib.parse import urlencode
+import time
+import os
+from requests import Session
 
-class HTTP:
-    def __init__(self, api_key, secret):
-        self.api_key = api_key
-        self.secret = secret
+class HTTP(Session):
+    def __init__(self, endpoint):
+        super().__init__()
+        self.endpoint = endpoint
+        self.api_key = os.getenv('API_KEY')
+        self.api_secret = os.getenv('API_SECRET')
 
-    def get_signature(self, params):
-        sorted_params = sorted(params.items(), key=lambda d: d[0], reverse=False)
-        encode_params = urlencode(sorted_params)
-        hashed = hmac.new(self.secret.encode('utf-8'), encode_params.encode('utf-8'), digestmod='sha256')
-        return hashed.hexdigest()
+    def request(self, method, path, *args, **kwargs):
+        url = self.endpoint + path
 
-    def get(self, path, params=None):
-        if params is None:
-            params = {}
-        params['api_key'] = self.api_key
-        params['timestamp'] = str(int(time.time() * 1000))
-        params['sign'] = self.get_signature(params)
-        url = 'https://api.bybit.com' + path + '?' + urlencode(params)
-        return requests.get(url)
+        # Sign the request if needed
+        if self.api_key and self.api_secret:
+            timestamp = int(time.time() * 1000)
+            kwargs['headers'] = kwargs.get('headers', {})
+            kwargs['headers'].update({
+                'api-key': self.api_key,
+                'api-expires': str(timestamp + 5000),
+            })
 
-    def post(self, path, params=None):
-        if params is None:
-            params = {}
-        params['api_key'] = self.api_key
-        params['timestamp'] = str(int(time.time() * 1000))
-        params['sign'] = self.get_signature(params)
-        url = 'https://api.bybit.com' + path
-        return requests.post(url, json=params)
+            # Create signature
+            signature_payload = f"{method}\n{path}\n{timestamp}"
+            signature = hmac.new(
+                self.api_secret.encode('utf-8'),
+                signature_payload.encode('utf-8'),
+                digestmod='sha256'
+            ).hexdigest()
+
+            kwargs['headers']['api-signature'] = signature
+
+        return super().request(method, url, *args, **kwargs)
