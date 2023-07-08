@@ -182,6 +182,7 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
+
     else:
         error_message = "Cannot accept new orders until current position is closed."
         return {
