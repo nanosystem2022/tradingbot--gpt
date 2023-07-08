@@ -148,28 +148,28 @@ def webhook():
     try:
         if data['exchange'] == 'binance-futures':
             if use_binance_futures:
-                if data['side'] in ['long', 'short']:
+                if data['side'] in ['buy', 'sell']:
                     response = create_order_binance(data, exchange)
                     current_position = data['side']
                 elif data['side'] in ['closelong', 'closeshort']:
                     response = close_order_binance(data, exchange)
                     current_position = 'closed'
                 else:
-                    raise ValueError("Invalid side value. Use 'long', 'short', 'closelong' or 'closeshort'.")
+                    raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
                 return {"status": "success", "data": response}, 200
             else:
                 raise ValueError("Binance Futures is not enabled in the config file.")
 
         elif data['exchange'] == 'bybit':
             if use_bybit:
-                if data['side'] in ['long', 'short']:
+                if data['side'] in ['buy', 'sell']:
                     response = create_order_bybit(data, session)
                     current_position = data['side']
                 elif data['side'] in ['closelong', 'closeshort']:
                     response = close_order_bybit(data, session)
                     current_position = 'closed'
                 else:
-                    raise ValueError("Invalid side value. Use 'long', 'short', 'closelong' or 'closeshort'.")
+                    raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
                 return {"status": "success", "data": response}, 200
             else:
                 raise ValueError("Bybit is not enabled in the config file.")
@@ -181,6 +181,7 @@ def webhook():
         return {"status": "error", "message": str(e)}, 400
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
+
 
 
 if __name__ == '__main__':
