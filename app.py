@@ -131,16 +131,19 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
+from flask import render_template
+
 @app.route('/balance', methods=['GET'])
 def get_balance():
     balance = {}
     if use_bybit:
         bybit_balance = session.fetch_balance()
-        balance['bybit'] = bybit_balance['total']
+        balance['bybit'] = {currency: amount for currency, amount in bybit_balance['total'].items() if amount > 0}
     if use_binance_futures:
         binance_balance = exchange.fetch_balance()
-        balance['binance'] = binance_balance['total']
+        balance['binance'] = {currency: amount for currency, amount in binance_balance['total'].items() if amount > 0}
     return render_template('index.html', balances=balance)
+
 
 
 @app.route('/webhook', methods=['POST'])
