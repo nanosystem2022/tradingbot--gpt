@@ -98,13 +98,8 @@ if use_binance:
     })
 
 def create_order(data):
-    global trade_open
-    if trade_open:
-        return jsonify({
-            "status": "error",
-            "message": "A trade is already open. Please close the current trade before opening a new one."
-        }), 400
-
+    status = None  # Add this line to define a default value for status
+    response = None  # Add this line to define a default value for response
     if use_bybit:
         response, status = create_order_bybit(data, session_bybit)
         if status == 200:
@@ -114,10 +109,15 @@ def create_order(data):
         if status == 200:
             active_orders[data['symbol']] = response['data']['id']
 
-    if status == 200:
-        trade_open = True
+    if status is None:  # Add this block to handle the case where no conditions were met
+        response = {
+            "status": "error",
+            "message": "No exchange is enabled in the configuration."
+        }
+        status = 400
 
     return jsonify(response), status
+
 
 def close_order(data):
     global trade_open
