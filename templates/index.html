@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Balance</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
-    <script>
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
-        socket.on('balance', function(balance) {
-            // TODO: update the page with the new balance
-        });
-    </script>
+    <title>Live Balance</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-    <h1>Balance</h1>
-    <!-- TODO: add elements to display the balance -->
+    <h1>Live Balance</h1>
+    <div id="balance"></div>
+
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        socket.on('balance', function(msg) {
+            $('#balance').html(JSON.stringify(msg));
+        });
+    </script>
 </body>
 </html>
