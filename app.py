@@ -11,7 +11,6 @@ with open('config.json') as config_file:
     config = json.load(config_file)
 
 active_orders = {} # to store the active orders
-trade_open = False # to store the status of the trade
 
 def is_exchange_enabled(exchange_name):
     if exchange_name in config['EXCHANGES']:
@@ -24,7 +23,6 @@ def create_order_binance(data, exchange):
     side = data['side']
     price = data.get('price', 0)
     quantity = data.get('quantity')
-    params = {'closePosition': 'Close-All'} if side == 'closeshort' or side == 'closelong' else {}
 
     if quantity is None:
         error_message = "The 'quantity' field is missing in the input data."
@@ -39,8 +37,7 @@ def create_order_binance(data, exchange):
             type=data['type'],
             side=side,
             amount=float(quantity),
-            price=price,
-            params=params
+            price=price
         )
         return {
             "status": "success",
@@ -57,7 +54,6 @@ def create_order_bybit(data, session):
     side = data['side']
     price = data.get('price', 0)
     quantity = data.get('quantity')
-    params = {'reduce_only': True} if side == 'closeshort' or side == 'closelong' else {}
 
     if quantity is None:
         error_message = "The 'quantity' field is missing in the input data."
@@ -73,12 +69,40 @@ def create_order_bybit(data, session):
             'order_type': data['type'],
             'qty': float(quantity),
             'price': price,
-            'time_in_force': 'GTC',
-            **params
+            'time_in_force': 'GTC'
         })
         return {
             "status": "success",
             "data": order.json()
+        }, 200
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+def close_order_bybit(symbol, order_id, session):
+    try:
+        res = session.post('/v2/private/order/cancel', json={
+            'symbol': symbol,
+            'order_id': order_id
+        })
+        return {
+            "status": "success",
+            "data": res.json()
+        }, 200
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+def close_order_binance(symbol, order_id, exchange):
+    try:
+        res = exchange.cancel_order(order_id, symbol)
+        return {
+            "status": "success",
+            "data": res
         }, 200
     except Exception as e:
         return {
@@ -98,8 +122,6 @@ if use_binance:
     })
 
 def create_order(data):
-    status = None  # Add this line to define a default value for status
-    response = None  # Add this line to define a default value for response
     if use_bybit:
         response, status = create_order_bybit(data, session_bybit)
         if status == 200:
@@ -109,19 +131,9 @@ def create_order(data):
         if status == 200:
             active_orders[data['symbol']] = response['data']['id']
 
-    if status is None:  # Add this block to handle the case where no conditions were met
-        response = {
-            "status": "error",
-            "message": "No exchange is enabled in the configuration."
-        }
-        status = 400
-
     return jsonify(response), status
 
-
-
 def close_order(data):
-    global trade_open
     symbol = data['symbol']
 
     if symbol not in active_orders:
@@ -137,7 +149,6 @@ def close_order(data):
 
     if status == 200:
         del active_orders[symbol]
-        trade_open = False
 
     return jsonify(response), status
 
