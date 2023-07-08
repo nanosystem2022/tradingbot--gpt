@@ -140,7 +140,7 @@ def get_balance():
     if use_binance_futures:
         binance_balance = exchange.fetch_balance()
         balance['binance'] = binance_balance['total']
-    return render_template('balance.html', balances=balance)
+    return render_template('index.html', balances=balance)
 
 
 @app.route('/webhook', methods=['POST'])
