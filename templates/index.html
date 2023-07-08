@@ -2,20 +2,16 @@
 <html>
 <head>
     <title>Balance</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        socket.on('balance', function(balance) {
+            // TODO: update the page with the new balance
+        });
+    </script>
 </head>
 <body>
     <h1>Balance</h1>
-    <ul>
-        {% for exchange, balance in balances.items() %}
-            <li>
-                <h2>{{ exchange }}</h2>
-                <ul>
-                    {% for currency, amount in balance.items() %}
-                        <li>{{ currency }}: {{ amount }}</li>
-                    {% endfor %}
-                </ul>
-            </li>
-        {% endfor %}
-    </ul>
+    <!-- TODO: add elements to display the balance -->
 </body>
 </html>
