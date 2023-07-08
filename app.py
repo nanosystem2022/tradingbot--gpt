@@ -1,7 +1,9 @@
-from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit
+import json
+import os
 import threading
 import time
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit
 import ccxt
 from custom_http import HTTP
 
@@ -156,7 +158,6 @@ def index():
 def handle_connect():
     emit('balance', get_balance())
     threading.Thread(target=send_balance).start()
-
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
