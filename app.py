@@ -10,8 +10,6 @@ app = Flask(__name__)
 with open('config.json') as config_file:
     config = json.load(config_file)
 
-active_orders = {} # to store the active orders
-
 def is_exchange_enabled(exchange_name):
     if exchange_name in config['EXCHANGES']:
         if config['EXCHANGES'][exchange_name]['ENABLED']:
@@ -81,81 +79,82 @@ def create_order_bybit(data, session):
             "message": str(e)
         }, 500
 
-def close_order_bybit(symbol, order_id, session):
-    try:
-        res = session.post('/v2/private/order/cancel', json={
-            'symbol': symbol,
-            'order_id': order_id
-        })
-        return {
-            "status": "success",
-            "data": res.json()
-        }, 200
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }, 500
-
-def close_order_binance(symbol, order_id, exchange):
-    try:
-        res = exchange.cancel_order(order_id, symbol)
-        return {
-            "status": "success",
-            "data": res
-        }, 200
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }, 500
-
-use_bybit = is_exchange_enabled('bybit')
-use_binance = is_exchange_enabled('binance')
+use_bybit = is_exchange_enabled('BYBIT')
+use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
 
 if use_bybit:
-    session_bybit = HTTP(config['EXCHANGES']['bybit']['API_KEY'], config['EXCHANGES']['bybit']['SECRET'])
-if use_binance:
-    binance = ccxt.binance({
-        'apiKey': config['EXCHANGES']['binance']['API_KEY'],
-        'secret': config['EXCHANGES']['binance']['SECRET']
+    print("Bybit is enabled!")
+session = HTTP(
+    endpoint='https://api.bybit.com',
+    api_key=config['EXCHANGES']['BYBIT']['API_KEY'],
+    api_secret=config['EXCHANGES']['BYBIT']['API_SECRET']
+)
+
+if use_binance_futures:
+    print("Binance is enabled!")
+    exchange = ccxt.binance({
+        'apiKey': config['EXCHANGES']['BINANCE-FUTURES']['API_KEY'],
+        'secret': config['EXCHANGES']['BINANCE-FUTURES']['API_SECRET'],
+        'options': {
+            'defaultType': 'future',
+        },
+        'urls': {
+            'api': {
+                'public': 'https://testnet.binancefuture.com/fapi/v1',
+                'private': 'https://testnet.binancefuture.com/fapi/v1',
+            },
+        }
     })
 
-@app.route('/create_order', methods=['POST'])
-def create_order():
-    data = request.json
+    if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
+        exchange.set_sandbox_mode(True)
 
-    if use_bybit:
-        response, status = create_order_bybit(data, session_bybit)
-        if status == 200:
-            active_orders[data['symbol']] = response['data']['result']['order_id']
-    if use_binance:
-        response, status = create_order_binance(data, binance)
-        if status == 200:
-            active_orders[data['symbol']] = response['data']['id']
+@app.route('/')
+def index():
+    return {'message': 'Server is running!'}
 
-    return jsonify(response), status
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    print("Hook Received!")
+    data = json.loads(request.data)
+    print(data)
 
-@app.route('/close_order', methods=['POST'])
-def close_order():
-    data = request.json
-    symbol = data['symbol']
-
-    if symbol not in active_orders:
-        return jsonify({
+    if int(data['key']) != config['KEY']:
+        error_message = "Invalid Key, Please Try Again!"
+        print(error_message)
+        return {
             "status": "error",
-            "message": "There's no active order for this symbol"
-        }), 400
+            "message": error_message
+        }, 400
 
-    if use_bybit:
-        response, status = close_order_bybit(symbol, active_orders[symbol], session_bybit)
-    if use_binance:
-        response, status = close_order_binance(symbol, active_orders[symbol], binance)
+    if data['exchange'] == 'binance-futures':
+        if use_binance_futures:
+            response, status_code = create_order_binance(data, exchange)
+            return jsonify(response), status_code
+        else:
+            error_message = "Binance Futures is not enabled in the config file."
+            return {
+                "status": "error",
+                "message": error_message
+            }, 400
 
-    if status == 200:
-        del active_orders[symbol]
+    elif data['exchange'] == 'bybit':
+        if use_bybit:
+            response, status_code = create_order_bybit(data, session)
+            return jsonify(response), status_code
+        else:
+            error_message = "Bybit is not enabled in the config file."
+            return {
+                "status": "error",
+                "message": error_message
+            }, 400
 
-    return jsonify(response), status
+    else:
+        error_message = "Unsupported exchange."
+        return {
+            "status": "error",
+            "message": error_message
+        }, 400
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run()
