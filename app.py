@@ -130,10 +130,6 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
-@app.route('/')
-def index():
-    return {'message': 'Server is running!'}
-
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position
@@ -149,37 +145,42 @@ def webhook():
             "message": error_message
         }, 400
 
-    close_order = data['side'] == 'closelong' or data['side'] == 'closeshort'
-    if current_position == 'closed' or close_order:
-        try:
-            if data['exchange'] == 'binance-futures':
-                if use_binance_futures:
+    try:
+        if data['exchange'] == 'binance-futures':
+            if use_binance_futures:
+                if data['side'] in ['long', 'short']:
                     response = create_order_binance(data, exchange)
-                    if data['side'] == 'long' or data['side'] == 'short':
-                        current_position = data['side']
-                    return {"status": "success", "data": response}, 200
+                    current_position = data['side']
+                elif data['side'] in ['closelong', 'closeshort']:
+                    response = close_order_binance(data, exchange)
+                    current_position = 'closed'
                 else:
-                    raise ValueError("Binance Futures is not enabled in the config file.")
-
-            elif data['exchange'] == 'bybit':
-                if use_bybit:
-                    response = create_order_bybit(data, session)
-                    if data['side'] == 'long' or data['side'] == 'short':
-                        current_position = data['side']
-                    return {"status": "success", "data": response}, 200
-                else:
-                    raise ValueError("Bybit is not enabled in the config file.")
-
+                    raise ValueError("Invalid side value. Use 'long', 'short', 'closelong' or 'closeshort'.")
+                return {"status": "success", "data": response}, 200
             else:
-                raise ValueError("Unsupported exchange.")
+                raise ValueError("Binance Futures is not enabled in the config file.")
 
-            if close_order:
-                current_position = 'closed'
+        elif data['exchange'] == 'bybit':
+            if use_bybit:
+                if data['side'] in ['long', 'short']:
+                    response = create_order_bybit(data, session)
+                    current_position = data['side']
+                elif data['side'] in ['closelong', 'closeshort']:
+                    response = close_order_bybit(data, session)
+                    current_position = 'closed'
+                else:
+                    raise ValueError("Invalid side value. Use 'long', 'short', 'closelong' or 'closeshort'.")
+                return {"status": "success", "data": response}, 200
+            else:
+                raise ValueError("Bybit is not enabled in the config file.")
 
-        except ValueError as e:
-            return {"status": "error", "message": str(e)}, 400
-        except Exception as e:
-            return {"status": "error", "message": str(e)}, 500
+        else:
+            raise ValueError("Unsupported exchange.")
+
+    except ValueError as e:
+        return {"status": "error", "message": str(e)}, 400
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
 
     else:
         error_message = "Cannot accept new orders until current position is closed."
