@@ -183,12 +183,5 @@ def webhook():
         return {"status": "error", "message": str(e)}, 500
 
 
-    else:
-        error_message = "Cannot accept new orders until current position is closed."
-        return {
-            "status": "error",
-            "message": error_message
-        }, 400
-
 if __name__ == '__main__':
     app.run()
