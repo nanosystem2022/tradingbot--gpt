@@ -1,11 +1,12 @@
-import json
-import os
 from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit
+import threading
 import time
 import ccxt
 from custom_http import HTTP
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 # load config.json
 with open('config.json') as config_file:
@@ -131,9 +132,6 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
-from flask import render_template
-
-@app.route('/balance', methods=['GET'])
 def get_balance():
     balance = {}
     if use_bybit:
@@ -142,8 +140,22 @@ def get_balance():
     if use_binance_futures:
         binance_balance = exchange.fetch_balance()
         balance['binance'] = {currency: amount for currency, amount in binance_balance['total'].items() if amount > 0}
-    return render_template('index.html', balances=balance)
+    return balance
 
+def send_balance():
+    while True:
+        balance = get_balance()
+        socketio.emit('balance', balance)
+        time.sleep(1)  # update every second
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@socketio.on('connect')
+def handle_connect():
+    emit('balance', get_balance())
+    threading.Thread(target=send_balance).start()
 
 
 @app.route('/webhook', methods=['POST'])
@@ -213,4 +225,4 @@ def webhook():
         return {"status": "error", "message": str(e)}, 500
 
 if __name__ == '__main__':
-    app.run()
+    socketio.run(app)
