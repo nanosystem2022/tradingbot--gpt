@@ -119,6 +119,7 @@ def create_order(data):
     return jsonify(response), status
 
 
+
 def close_order(data):
     global trade_open
     symbol = data['symbol']
