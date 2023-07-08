@@ -1,14 +1,14 @@
+import os
 import hmac
 import time
-import os
 from requests import Session
 
 class HTTP(Session):
-    def __init__(self, endpoint):
+    def __init__(self, endpoint, api_key, api_secret):
         super().__init__()
         self.endpoint = endpoint
-        self.api_key = os.getenv('API_KEY')
-        self.api_secret = os.getenv('API_SECRET')
+        self.api_key = api_key
+        self.api_secret = api_secret
 
     def request(self, method, path, *args, **kwargs):
         url = self.endpoint + path
