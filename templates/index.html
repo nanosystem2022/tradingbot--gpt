@@ -1,31 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>قیمت لحظه‌ای تتر و بیتکوین</title>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <title>Balance</title>
 </head>
 <body>
-    <h1>قیمت لحظه‌ای تتر و بیتکوین به ریال ایران</h1>
-    <p id="usdt_sell_price">قیمت فروش تتر: در حال بارگزاری...</p>
-    <p id="btc_sell_price">قیمت فروش بیتکوین: در حال بارگزاری...</p>
-
-    <script>
-    function updatePrices() {
-        $.ajax({
-            url: '/prices',
-            type: 'GET',
-            success: function(data) {
-                $('#usdt_sell_price').text("قیمت فروش تتر: " + data.usdt_sell_price + " ریال");
-                $('#btc_sell_price').text("قیمت فروش بیتکوین: " + data.btc_sell_price + " ریال");
-            }
-        });
-    }
-
-    // Update prices every 30 seconds
-    setInterval(updatePrices, 30000);
-
-    // Update prices on page load
-    updatePrices();
-    </script>
+    <h1>Balance</h1>
+    <ul>
+        {% for exchange, balance in balances.items() %}
+            <li>
+                <h2>{{ exchange }}</h2>
+                <ul>
+                    {% for currency, amount in balance.items() %}
+                        <li>{{ currency }}: {{ amount }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+    </ul>
 </body>
 </html>
