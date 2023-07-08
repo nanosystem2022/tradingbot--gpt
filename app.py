@@ -4,7 +4,7 @@ import hmac
 import time
 from flask import Flask, request
 import ccxt
-from requests import Session
+from custom_http import HTTP  # Add this line
 
 app = Flask(__name__)
 
