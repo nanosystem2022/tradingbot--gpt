@@ -12,6 +12,7 @@ with open('config.json') as config_file:
     config = json.load(config_file)
 
 current_position = 'closed'
+current_side = None
 
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
@@ -132,7 +133,7 @@ if use_binance_futures:
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    global current_position
+    global current_position, current_side
     print("Hook Received!")
     data = json.loads(request.data)
     print(data)
@@ -149,11 +150,18 @@ def webhook():
         if data['exchange'] == 'binance-futures':
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
-                    response = create_order_binance(data, exchange)
-                    current_position = data['side']
-                elif data['side'] in ['closelong', 'closeshort'] and current_position != 'closed':
-                    response = close_order_binance(data, exchange)
-                    current_position = 'closed'
+                    if current_position == 'closed':
+                        response = create_order_binance(data, exchange)
+                        current_position = 'open'
+                        current_side = data['side']
+                    else:
+                        raise ValueError("Cannot open a new order until the current one is closed.")
+                elif data['side'] in ['closelong', 'closeshort']:
+                    if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
+                        response = close_order_binance(data, exchange)
+                        current_position = 'closed'
+                    else:
+                        raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
                     raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
                 return {"status": "success", "data": response}, 200
@@ -163,11 +171,18 @@ def webhook():
         elif data['exchange'] == 'bybit':
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
-                    response = create_order_bybit(data, session)
-                    current_position = data['side']
-                elif data['side'] in ['closelong', 'closeshort'] and current_position != 'closed':
-                    response = close_order_bybit(data, session)
-                    current_position = 'closed'
+                    if current_position == 'closed':
+                        response = create_order_bybit(data, session)
+                        current_position = 'open'
+                        current_side = data['side']
+                    else:
+                        raise ValueError("Cannot open a new order until the current one is closed.")
+                elif data['side'] in ['closelong', 'closeshort']:
+                    if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
+                        response = close_order_bybit(data, session)
+                        current_position = 'closed'
+                    else:
+                        raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
                     raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
                 return {"status": "success", "data": response}, 200
@@ -181,7 +196,6 @@ def webhook():
         return {"status": "error", "message": str(e)}, 400
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
-
 
 if __name__ == '__main__':
     app.run()
