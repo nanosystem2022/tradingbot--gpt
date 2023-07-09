@@ -4,7 +4,6 @@ from flask import Flask, render_template, request, jsonify
 import time
 import ccxt
 from custom_http import HTTP
-from flask import Flask, render_template
 from flask_socketio import SocketIO
 
 app = Flask(__name__)
