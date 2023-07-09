@@ -7,7 +7,7 @@ import ccxt
 from custom_http import HTTP
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+CORS(app) 
 
 # load config.json
 with open('config.json') as config_file:
