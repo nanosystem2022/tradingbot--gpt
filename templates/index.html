@@ -1,25 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Live Balance Update</title>
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            var socket = io.connect('http://localhost:5000');  // Replace with your server address
-
-            socket.on('balance_update', function(balances) {
-                // Update the balance on the page
-                var balanceElement = document.getElementById('balance');
-                balanceElement.innerHTML = JSON.stringify(balances, null, 2);
-            });
-
-            // Request balance update
-            socket.emit('request_balance_update');
-        });
-    </script>
+    <title>Account Balance</title>
 </head>
 <body>
-    <h1>Live Balance Update</h1>
-    <pre id="balance"></pre>
+    <h1>Account Balance</h1>
+    <h2>Binance</h2>
+    <p>Total: {{ binance.total }}</p>
+    <p>Free: {{ binance.free }}</p>
+    <h2>Bybit</h2>
+    <p>Total: {{ bybit.total }}</p>
+    <p>Free: {{ bybit.free }}</p>
 </body>
 </html>
