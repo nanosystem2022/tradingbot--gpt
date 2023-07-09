@@ -1,13 +1,11 @@
 import json
 import os
 from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit
 import time
 import ccxt
 from custom_http import HTTP
 
 app = Flask(__name__)
-CORS(app) 
 
 # load config.json
 with open('config.json') as config_file:
@@ -199,23 +197,12 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-@socketio.on('request_balance_update')
-def update_balance():
-    # Get the balance from the exchanges
-    balances = {}
-    if use_bybit:
-        bybit_balance = session.get('/v2/private/wallet/balance').json()
-        balances['bybit'] = bybit_balance['result']
-    if use_binance_futures:
-        binance_balance = exchange.fetch_balance()
-        balances['binance'] = binance_balance['total']
-    emit('balance_update', balances, broadcast=True)
-
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
+@app.route('/balance', methods=['GET'])
+def balance():
+    balance_binance = exchange.fetch_balance()
+    response_bybit = session.get('/v2/private/wallet/balance')
+    balance_bybit = response_bybit.json()
+    return render_template('balance.html', binance=balance_binance, bybit=balance_bybit)
 
 if __name__ == '__main__':
-    socketio.run(app)
+    app.run()
