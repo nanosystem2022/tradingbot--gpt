@@ -1,23 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Live Crypto Balance</title>
+    <title>Exchange Balance</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-</head>
-<body>
-    <button id="getBalance">Get Balance</button>
-    <div id="balance"></div>
-
-    <script type="text/javascript">
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
-        socket.on('balance', function(msg) {
-            $('#balance').append('<p>' + msg.exchange + ': ' + JSON.stringify(msg.balance) + '</p>');
+    <script>
+        var socket = io.connect('http://localhost:5000');
+        socket.on('connect', function() {
+            socket.emit('request_balance');
         });
-
-        $('#getBalance').click(function() {
-            socket.emit('get_balance', {});
+        socket.on('update_balance', function(balance) {
+            // Update the balance on the page
+            for (var currency in balance) {
+                document.getElementById(currency).innerText = balance[currency]['free'];
+            }
+        });
+        socket.on('error', function(message) {
+            // Handle the error
+            console.error(message);
         });
     </script>
+</head>
+<body>
+    <h1>Exchange Balance</h1>
+    <!-- You will need to add an element for each currency in your balance -->
+    <p><strong>BTC:</strong> <span id="BTC"></span></p>
+    <p><strong>ETH:</strong> <span id="ETH"></span></p>
+    <!-- Add more currencies as needed -->
 </body>
 </html>
