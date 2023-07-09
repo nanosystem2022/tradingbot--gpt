@@ -2,3 +2,4 @@ Flask
 ccxt
 gunicorn
 flask_socketio
+flask-cors
