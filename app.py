@@ -5,9 +5,10 @@ import time
 import ccxt
 from custom_http import HTTP
 from flask import Flask, render_template
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 # load config.json
 with open('config.json') as config_file:
@@ -133,20 +134,22 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@socketio.on('get_balance')
-def handle_get_balance(message):
-    # Get the balance from the exchanges
-    if use_bybit:
-        bybit_balance = session.get('/v2/private/wallet/balance').json()
-        emit('balance', {'exchange': 'Bybit', 'balance': bybit_balance})
-
+def get_balance(exchange):
+    balance = exchange.fetch_balance()
+    return balance
+@socketio.on('request_balance')
+def handle_request_balance():
     if use_binance_futures:
-        binance_balance = exchange.fetch_balance()
-        emit('balance', {'exchange': 'Binance Futures', 'balance': binance_balance})
+        balance = get_balance(exchange)
+        emit('update_balance', balance)
+    elif use_bybit:
+        # Bybit does not support fetch_balance() directly. You may need to use other methods.
+        emit('error', 'Bybit does not support fetch_balance() directly.')
+    else:
+        emit('error', 'No exchange is enabled.')
+@app.route('/balance', methods=['GET'])
+def balance():
+    return render_template('index.html')
 
 
 
@@ -217,4 +220,4 @@ def webhook():
         return {"status": "error", "message": str(e)}, 500
 
 if __name__ == '__main__':
-    app.run()
+    socketio.run(app)
