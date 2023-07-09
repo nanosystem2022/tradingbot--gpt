@@ -4,6 +4,8 @@ from flask import Flask, render_template, request, jsonify
 import time
 import ccxt
 from custom_http import HTTP
+from flask import Flask, render_template
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 
@@ -130,6 +132,23 @@ if use_binance_futures:
 
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@socketio.on('get_balance')
+def handle_get_balance(message):
+    # Get the balance from the exchanges
+    if use_bybit:
+        bybit_balance = session.get('/v2/private/wallet/balance').json()
+        emit('balance', {'exchange': 'Bybit', 'balance': bybit_balance})
+
+    if use_binance_futures:
+        binance_balance = exchange.fetch_balance()
+        emit('balance', {'exchange': 'Binance Futures', 'balance': binance_balance})
+
+
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
