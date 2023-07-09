@@ -1,18 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Live Balance</title>
+    <title>Live Crypto Balance</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </head>
 <body>
-    <h1>Live Balance</h1>
+    <button id="getBalance">Get Balance</button>
     <div id="balance"></div>
 
-    <script>
+    <script type="text/javascript">
         var socket = io.connect('http://' + document.domain + ':' + location.port);
         socket.on('balance', function(msg) {
-            $('#balance').html(JSON.stringify(msg));
+            $('#balance').append('<p>' + msg.exchange + ': ' + JSON.stringify(msg.balance) + '</p>');
+        });
+
+        $('#getBalance').click(function() {
+            socket.emit('get_balance', {});
         });
     </script>
 </body>
