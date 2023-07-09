@@ -199,15 +199,18 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-@socketio.on('update_balance')
+@socketio.on('request_balance_update')
 def update_balance():
     # Get the balance from the exchanges
+    balances = {}
     if use_bybit:
         bybit_balance = session.get('/v2/private/wallet/balance').json()
-        emit('bybit_balance', bybit_balance, broadcast=True)
+        balances['bybit'] = bybit_balance['result']
     if use_binance_futures:
         binance_balance = exchange.fetch_balance()
-        emit('binance_balance', binance_balance, broadcast=True)
+        balances['binance'] = binance_balance['total']
+    emit('balance_update', balances, broadcast=True)
+
 
 @app.route('/')
 def index():
