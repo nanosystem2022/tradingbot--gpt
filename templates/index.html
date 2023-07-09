@@ -1,31 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Real-Time Balance</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <title>Live Balance Update</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
     <script>
-    var socket = io.connect('http://localhost:5000');  // Replace with your server address
+        document.addEventListener("DOMContentLoaded", function() {
+            var socket = io.connect('http://localhost:5000');  // Replace with your server address
 
-    socket.on('connect', function() {
-        socket.emit('update_balance');
-    });
+            socket.on('balance_update', function(balances) {
+                // Update the balance on the page
+                var balanceElement = document.getElementById('balance');
+                balanceElement.innerHTML = JSON.stringify(balances, null, 2);
+            });
 
-    socket.on('bybit_balance', function(balance) {
-        // Update the balance on the page
-        document.getElementById('bybit_balance').innerText = JSON.stringify(balance);
-    });
-
-    socket.on('binance_balance', function(balance) {
-        // Update the balance on the page
-        document.getElementById('binance_balance').innerText = JSON.stringify(balance);
-    });
+            // Request balance update
+            socket.emit('request_balance_update');
+        });
     </script>
 </head>
 <body>
-    <h1>Real-Time Balance</h1>
-    <h2>Bybit Balance:</h2>
-    <div id="bybit_balance"></div>
-    <h2>Binance Balance:</h2>
-    <div id="binance_balance"></div>
+    <h1>Live Balance Update</h1>
+    <pre id="balance"></pre>
 </body>
 </html>
