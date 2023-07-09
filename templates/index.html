@@ -1,30 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Exchange Balance</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <title>Real-Time Balance</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
     <script>
-        var socket = io.connect('http://localhost:5000');
-        socket.on('connect', function() {
-            socket.emit('request_balance');
-        });
-        socket.on('update_balance', function(balance) {
-            // Update the balance on the page
-            for (var currency in balance) {
-                document.getElementById(currency).innerText = balance[currency]['free'];
-            }
-        });
-        socket.on('error', function(message) {
-            // Handle the error
-            console.error(message);
-        });
+    var socket = io.connect('http://localhost:5000');  // Replace with your server address
+
+    socket.on('connect', function() {
+        socket.emit('update_balance');
+    });
+
+    socket.on('bybit_balance', function(balance) {
+        // Update the balance on the page
+        document.getElementById('bybit_balance').innerText = JSON.stringify(balance);
+    });
+
+    socket.on('binance_balance', function(balance) {
+        // Update the balance on the page
+        document.getElementById('binance_balance').innerText = JSON.stringify(balance);
+    });
     </script>
 </head>
 <body>
-    <h1>Exchange Balance</h1>
-    <!-- You will need to add an element for each currency in your balance -->
-    <p><strong>BTC:</strong> <span id="BTC"></span></p>
-    <p><strong>ETH:</strong> <span id="ETH"></span></p>
-    <!-- Add more currencies as needed -->
+    <h1>Real-Time Balance</h1>
+    <h2>Bybit Balance:</h2>
+    <div id="bybit_balance"></div>
+    <h2>Binance Balance:</h2>
+    <div id="binance_balance"></div>
 </body>
 </html>
