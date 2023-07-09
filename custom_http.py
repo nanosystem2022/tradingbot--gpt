@@ -33,3 +33,6 @@ class HTTP(Session):
             kwargs['headers']['api-signature'] = signature
 
         return super().request(method, url, *args, **kwargs)
+
+    def get(self, path, *args, **kwargs):
+        return self.request('GET', path, *args, **kwargs)
