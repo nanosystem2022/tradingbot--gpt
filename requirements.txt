@@ -1,4 +1,4 @@
 Flask
 ccxt
 gunicorn
-flask-socketio
+flask_socketio
