@@ -147,21 +147,6 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
-@app.route('/balance', methods=['GET'])
-def get_balance():
-    balance = {}
-    trades = []
-    if use_bybit:
-        bybit_balance = session.fetch_balance()
-        balance['bybit'] = {currency: amount for currency, amount in bybit_balance['total'].items() if amount > 0}
-        bybit_trades = session.fetchMyTrades()
-        trades.extend(bybit_trades)
-    if use_binance_futures:
-        binance_balance = exchange.fetch_balance()
-        balance['binance'] = {currency: amount for currency, amount in binance_balance['total'].items() if amount > 0}
-        binance_trades = exchange.fetchMyTrades()
-        trades.extend(binance_trades)
-    return render_template('index.html', balances=balance, trades=trades)
 
 
 
@@ -204,24 +189,24 @@ def webhook():
 
         elif data['exchange'] == 'bybit':
             if use_bybit:
-                if data['side'] in ['buy', 'sell']:
-                    if current_position == 'closed':
-                        response = close_order_bybit(data, session)
-                        current_position = 'open'
-                        current_side = data['side']
-                    else:
-                        raise ValueError("Cannot open a new order until the current one is closed.")
-                elif data['side'] in ['closelong', 'closeshort']:
-                    if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
-                        response = close_order(data, session)
-                        current_position = 'closed'
-                    else:
-                        raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
-                else:
-                    raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-                return {"status": "success", "data": response}, 200
+        if data['side'] in ['buy', 'sell']:
+            if current_position == 'closed':
+                response = create_order(data, None, exchange)
+                current_position = 'open'
+                current_side = data['side']
             else:
-                raise ValueError("Bybit is not enabled in the config file.")
+                raise ValueError("Cannot open a new order until the current one is closed.")
+        elif data['side'] in ['closelong', 'closeshort']:
+            if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
+                response = close_order(data, None, exchange)
+                current_position = 'closed'
+            else:
+                raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
+        else:
+            raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
+
+        # اینجا به صفحه ای منتقل می شویم که اطلاعات سفارش را نمایش می دهد
+        return redirect(url_for('trade_info', symbol=data['symbol'], quantity=data['quantity'], side=data['side'], profit_loss_percentage=0, image_url="https://example.com/btc.png"))
 
         else:
             raise ValueError("Unsupported exchange.")
@@ -231,6 +216,15 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
+@app.route('/trade_info')
+def trade_info():
+    symbol = request.args.get('symbol')
+    quantity = request.args.get('quantity')
+    side = request.args.get('side')
+    profit_loss_percentage = request.args.get('profit_loss_percentage')
+    image_url = request.args.get('image_url')
+
+    return render_template('index.html', symbol=symbol, quantity=quantity, side=side, profit_loss_percentage=profit_loss_percentage, image_url=image_url)
 
 if __name__ == '__main__':
     app.run()
