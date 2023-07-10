@@ -99,6 +99,13 @@ def close_order_bybit(data, session):
         'time_in_force': 'GTC'
     })
     return order.json()
+def get_binance_balance():
+    balance = exchange.fetch_balance()
+    return {currency: amount for currency, amount in balance['total'].items() if amount > 0}
+
+def get_bybit_balance():
+    response = session.get('/v2/private/wallet/balance')
+    return {currency: details['available_balance'] for currency, details in response.json()['result'].items() if details['available_balance'] > 0}
 
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
@@ -197,21 +204,11 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-def get_binance_balance():
-    balance = exchange.fetch_balance()
-    return {currency: amount for currency, amount in balance['total'].items() if amount > 0}
-
-def get_bybit_balance():
-    response = session.get('/v2/private/wallet/balance')
-    return {currency: details['available_balance'] for currency, details in response.json()['result'].items() if details['available_balance'] > 0}
-
-
 @app.route('/balance')
 def balance():
     binance_balance = get_binance_balance() if use_binance_futures else "Binance is not enabled"
     bybit_balance = get_bybit_balance() if use_bybit else "Bybit is not enabled"
-    return render_template('index.html', binance_balance=binance_balance, bybit_balance=bybit_balance)
-
+    return render_template('balance.html', binance_balance=binance_balance, bybit_balance=bybit_balance)
 
 if __name__ == '__main__':
     app.run()
