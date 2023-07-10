@@ -2,7 +2,7 @@ import os
 import json
 import hmac
 import time
-from flask import Flask, request
+from flask import Flask, request, render_template, redirect, url_for
 import ccxt
 from custom_http import HTTP
 
@@ -147,9 +147,6 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
-
-
-
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position, current_side
@@ -183,30 +180,30 @@ def webhook():
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
                     raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-                return {"status": "success", "data": response}, 200
+                return redirect(url_for('trade_info', symbol=data['symbol'], quantity=data['quantity'], side=data['side'], profit_loss_percentage=0, image_url="https://example.com/btc.png"))
             else:
                 raise ValueError("Binance Futures is not enabled in the config file.")
 
         elif data['exchange'] == 'bybit':
             if use_bybit:
-        if data['side'] in ['buy', 'sell']:
-            if current_position == 'closed':
-                response = create_order(data, None, exchange)
-                current_position = 'open'
-                current_side = data['side']
+                if data['side'] in ['buy', 'sell']:
+                    if current_position == 'closed':
+                        response = create_order(data, session)
+                        current_position = 'open'
+                        current_side = data['side']
+                    else:
+                        raise ValueError("Cannot open a new order until the current one is closed.")
+                elif data['side'] in ['closelong', 'closeshort']:
+                    if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
+                        response = close_order(data, session)
+                        current_position = 'closed'
+                    else:
+                        raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
+                else:
+                    raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
+                return redirect(url_for('trade_info', symbol=data['symbol'], quantity=data['quantity'], side=data['side'], profit_loss_percentage=0, image_url="https://example.com/btc.png"))
             else:
-                raise ValueError("Cannot open a new order until the current one is closed.")
-        elif data['side'] in ['closelong', 'closeshort']:
-            if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
-                response = close_order(data, None, exchange)
-                current_position = 'closed'
-            else:
-                raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
-        else:
-            raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-
-        # اینجا به صفحه ای منتقل می شویم که اطلاعات سفارش را نمایش می دهد
-        return redirect(url_for('trade_info', symbol=data['symbol'], quantity=data['quantity'], side=data['side'], profit_loss_percentage=0, image_url="https://example.com/btc.png"))
+                raise ValueError("Bybit is not enabled in the config file.")
 
         else:
             raise ValueError("Unsupported exchange.")
@@ -224,7 +221,18 @@ def trade_info():
     profit_loss_percentage = request.args.get('profit_loss_percentage')
     image_url = request.args.get('image_url')
 
-    return render_template('index.html', symbol=symbol, quantity=quantity, side=side, profit_loss_percentage=profit_loss_percentage, image_url=image_url)
+    return render_template('trade_info.html', symbol=symbol, quantity=quantity, side=side, profit_loss_percentage=profit_loss_percentage, image_url=image_url)
+
+@app.route('/balance', methods=['GET'])
+def get_balance():
+    balance = {}
+    if use_bybit:
+        bybit_balance = session.fetch_balance()
+        balance['bybit'] = {currency: amount for currency, amount in bybit_balance['total'].items() if amount > 0}
+    if use_binance_futures:
+        binance_balance = exchange.fetch_balance()
+        balance['binance'] = {currency: amount for currency, amount in binance_balance['total'].items() if amount > 0}
+    return render_template('index.html', balances=balance)
 
 if __name__ == '__main__':
     app.run()
