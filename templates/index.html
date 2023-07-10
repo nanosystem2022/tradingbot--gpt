@@ -1,42 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Balance</title>
+    <title>Trade Information</title>
 </head>
 <body>
-    <h1>Balance</h1>
-    <ul>
-        {% for exchange, balance in balances.items() %}
-            <li>
-                <h2>{{ exchange }}</h2>
-                <ul>
-                    {% for currency, amount in balance.items() %}
-                        <li>{{ currency }}: {{ amount }}</li>
-                    {% endfor %}
-                </ul>
-            </li>
-        {% endfor %}
-    </ul>
-
-    <h1>My Trades</h1>
-    <table>
-        <tr>
-            <th>Symbol</th>
-            <th>Amount</th>
-            <th>Price</th>
-            <th>Side</th>
-            <th>Timestamp</th>
-        </tr>
-        {% for trade in trades %}
-        <tr>
-            <td>{{ trade.symbol }}</td>
-            <td>{{ trade.amount }}</td>
-            <td>{{ trade.price }}</td>
-            <td>{{ trade.side }}</td>
-            <td>{{ trade.timestamp }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    
+    <h1>Trade Information</h1>
+    <p>Symbol: {{ symbol }}</p>
+    <p>Quantity: {{ quantity }}</p>
+    <p>Side: {{ side }}</p>
+    <p>Profit/Loss Percentage: {{ profit_loss_percentage }}</p>
+    <img src="{{ image_url }}" alt="Symbol Image">
 </body>
 </html>
