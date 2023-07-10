@@ -199,11 +199,12 @@ def webhook():
 
 def get_binance_balance():
     balance = exchange.fetch_balance()
-    return balance['total']
+    return {currency: amount for currency, amount in balance['total'].items() if amount > 0}
 
 def get_bybit_balance():
     response = session.get('/v2/private/wallet/balance')
-    return response.json()['result']['USDT']['available_balance']
+    return {currency: details['available_balance'] for currency, details in response.json()['result'].items() if details['available_balance'] > 0}
+
 
 @app.route('/balance')
 def balance():
