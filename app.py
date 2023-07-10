@@ -197,12 +197,20 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-@app.route('/balance', methods=['GET'])
+def get_binance_balance():
+    balance = exchange.fetch_balance()
+    return balance['total']
+
+def get_bybit_balance():
+    response = session.get('/v2/private/wallet/balance')
+    return response.json()['result']['USDT']['available_balance']
+
+@app.route('/balance')
 def balance():
-    balance_binance = exchange.fetch_balance()
-    response_bybit = session.get('/v2/private/wallet/balance')
-    balance_bybit = response_bybit.json()
-    return render_template('index.html', binance=balance_binance, bybit=balance_bybit)
+    binance_balance = get_binance_balance() if use_binance_futures else "Binance is not enabled"
+    bybit_balance = get_bybit_balance() if use_bybit else "Bybit is not enabled"
+    return render_template('balance.html', binance_balance=binance_balance, bybit_balance=bybit_balance)
+
 
 if __name__ == '__main__':
     app.run()
