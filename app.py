@@ -213,6 +213,7 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
+
 @app.route('/trade_info')
 def trade_info():
     symbol = request.args.get('symbol')
