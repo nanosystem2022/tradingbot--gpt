@@ -209,7 +209,7 @@ def get_bybit_balance():
 def balance():
     binance_balance = get_binance_balance() if use_binance_futures else "Binance is not enabled"
     bybit_balance = get_bybit_balance() if use_bybit else "Bybit is not enabled"
-    return render_template('balance.html', binance_balance=binance_balance, bybit_balance=bybit_balance)
+    return render_template('index.html', binance_balance=binance_balance, bybit_balance=bybit_balance)
 
 
 if __name__ == '__main__':
