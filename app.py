@@ -147,6 +147,24 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
+@app.route('/balance', methods=['GET'])
+def get_balance():
+    balance = {}
+    trades = []
+    if use_bybit:
+        bybit_balance = session.fetch_balance()
+        balance['bybit'] = {currency: amount for currency, amount in bybit_balance['total'].items() if amount > 0}
+        bybit_trades = session.fetchMyTrades()
+        trades.extend(bybit_trades)
+    if use_binance_futures:
+        binance_balance = exchange.fetch_balance()
+        balance['binance'] = {currency: amount for currency, amount in binance_balance['total'].items() if amount > 0}
+        binance_trades = exchange.fetchMyTrades()
+        trades.extend(binance_trades)
+    return render_template('index.html', balances=balance, trades=trades)
+
+
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position, current_side
@@ -213,16 +231,6 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-@app.route('/balance', methods=['GET'])
-def get_balance():
-    balance = {}
-    if use_bybit:
-        bybit_balance = session.fetch_balance()
-        balance['bybit'] = {currency: amount for currency, amount in bybit_balance['total'].items() if amount > 0}
-    if use_binance_futures:
-        binance_balance = exchange.fetch_balance()
-        balance['binance'] = {currency: amount for currency, amount in binance_balance['total'].items() if amount > 0}
-    return render_template('index.html', balances=balance)
 
 if __name__ == '__main__':
     app.run()
