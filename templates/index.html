@@ -17,5 +17,26 @@
             </li>
         {% endfor %}
     </ul>
+
+    <h1>My Trades</h1>
+    <table>
+        <tr>
+            <th>Symbol</th>
+            <th>Amount</th>
+            <th>Price</th>
+            <th>Side</th>
+            <th>Timestamp</th>
+        </tr>
+        {% for trade in trades %}
+        <tr>
+            <td>{{ trade.symbol }}</td>
+            <td>{{ trade.amount }}</td>
+            <td>{{ trade.price }}</td>
+            <td>{{ trade.side }}</td>
+            <td>{{ trade.timestamp }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    
 </body>
 </html>
