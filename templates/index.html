@@ -6,7 +6,13 @@
 </head>
 <body>
     <h1>Account Balance</h1>
-    <p>Binance Futures: {{ binance_balance }}</p>
-    <p>Bybit: {{ bybit_balance }}</p>
+    <h2>Binance Futures</h2>
+    {% for currency, amount in binance_balance.items() %}
+    <p>{{ currency }}: {{ amount }}</p>
+    {% endfor %}
+    <h2>Bybit</h2>
+    {% for currency, amount in bybit_balance.items() %}
+    <p>{{ currency }}: {{ amount }}</p>
+    {% endfor %}
 </body>
 </html>
