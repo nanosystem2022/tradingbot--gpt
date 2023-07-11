@@ -1,55 +1,24 @@
-import os
 import json
-import hmac
+import os
+from flask import Flask, render_template, request, jsonify
 import time
-from flask import Flask, request, render_template, redirect, url_for
 import ccxt
 from custom_http import HTTP
 
 app = Flask(__name__)
 
-# Load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
 
 current_position = 'closed'
 current_side = None
-
-class HTTP(Session):
-    def __init__(self, endpoint, api_key, api_secret):
-        super().__init__()
-        self.endpoint = endpoint
-        self.api_key = api_key
-        self.api_secret = api_secret
-
-    def request(self, method, path, *args, **kwargs):
-        url = self.endpoint + path
-
-        # Sign the request if needed
-        if self.api_key and self.api_secret:
-            timestamp = int(time.time() * 1000)
-            kwargs['headers'] = kwargs.get('headers', {})
-            kwargs['headers'].update({
-                'api-key': self.api_key,
-                'api-expires': str(timestamp + 5000),
-            })
-
-            # Create signature
-            signature_payload = f"{method}\n{path}\n{timestamp}"
-            signature = hmac.new(
-                self.api_secret.encode('utf-8'),
-                signature_payload.encode('utf-8'),
-                digestmod='sha256'
-            ).hexdigest()
-
-            kwargs['headers']['api-signature'] = signature
-
-        return super().request(method, url, *args, **kwargs)
+last_order_data = None
 
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
-def create_order(data, session, exchange=None):
+def create_order_binance(data, exchange):
+    global last_order_data
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
@@ -61,30 +30,25 @@ def create_order(data, session, exchange=None):
         side = "buy"
 
     if order_type == "market":
-        order = exchange.create_market_order(symbol, side, quantity) if exchange else session.post('/v2/private/order/create', json={
-            'symbol': symbol,
-            'side': side,
-            'order_type': data['type'],
-            'qty': float(quantity),
-            'price': 0,
-            'time_in_force': 'GTC'
-        }).json()
+        order = exchange.create_market_order(symbol, side, quantity)
     elif order_type == "limit":
         price = data['price']
-        order = exchange.create_limit_order(symbol, side, quantity, price) if exchange else session.post('/v2/private/order/create', json={
-            'symbol': symbol,
-            'side': side,
-            'order_type': data['type'],
-            'qty': float(quantity),
-            'price': price,
-            'time_in_force': 'GTC'
-        }).json()
+        order = exchange.create_limit_order(symbol, side, quantity, price)
     else:
         raise ValueError("Invalid order type")
 
+    last_order_data = {
+        "symbol": symbol,
+        "quantity": quantity,
+        "market_side": side,
+        "image_url": "https://example.com/{}.png".format(symbol),
+        "profit_or_loss": "0%"
+    }
+
     return order
 
-def close_order(data, session, exchange=None):
+def close_order_binance(data, exchange):
+    global last_order_data
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
@@ -102,22 +66,16 @@ def close_order(data, session, exchange=None):
         side='sell' if side == 'closelong' else 'buy',
         amount=float(quantity),
         price=price
-    ) if exchange else session.post('/v2/private/order/create', json={
-        'symbol': symbol,
-        'side': 'sell' if side == 'closelong' else 'buy',
-        'order_type': data['type'],
-        'qty': float(quantity),
-        'price': price,
-        'time_in_force': 'GTC'
-    }).json()
+    )
+
+    last_order_data = None
 
     return order
 
+# ... تابع‌های دیگر به همان شکل که در کد اصلی شما بودند ...
+
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
-
-session = None
-exchange = None
 
 if use_bybit:
     print("Bybit is enabled!")
@@ -167,20 +125,20 @@ def webhook():
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
                     if current_position == 'closed':
-                        response = create_order(data, None, exchange)
+                        response = create_order_binance(data, exchange)
                         current_position = 'open'
                         current_side = data['side']
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
-                        response = close_order(data, None, exchange)
+                        response = close_order_binance(data, exchange)
                         current_position = 'closed'
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
                     raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-                return redirect(url_for('trade_info', symbol=data['symbol'], quantity=data['quantity'], side=data['side'], profit_loss_percentage=0, image_url="https://example.com/btc.png"))
+                return {"status": "success", "data": response}, 200
             else:
                 raise ValueError("Binance Futures is not enabled in the config file.")
 
@@ -188,20 +146,20 @@ def webhook():
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
                     if current_position == 'closed':
-                        response = create_order(data, session)
+                        response = create_order_bybit(data, session)
                         current_position = 'open'
                         current_side = data['side']
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
-                        response = close_order(data, session)
+                        response = close_order_bybit(data, session)
                         current_position = 'closed'
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
                     raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-                return redirect(url_for('trade_info', symbol=data['symbol'], quantity=data['quantity'], side=data['side'], profit_loss_percentage=0, image_url="https://example.com/btc.png"))
+                return {"status": "success", "data": response}, 200
             else:
                 raise ValueError("Bybit is not enabled in the config file.")
 
@@ -213,27 +171,13 @@ def webhook():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-
-@app.route('/trade_info')
-def trade_info():
-    symbol = request.args.get('symbol')
-    quantity = request.args.get('quantity')
-    side = request.args.get('side')
-    profit_loss_percentage = request.args.get('profit_loss_percentage')
-    image_url = request.args.get('image_url')
-
-    return render_template('trade_info.html', symbol=symbol, quantity=quantity, side=side, profit_loss_percentage=profit_loss_percentage, image_url=image_url)
-
-@app.route('/balance', methods=['GET'])
-def get_balance():
-    balance = {}
-    if use_bybit:
-        bybit_balance = session.fetch_balance()
-        balance['bybit'] = {currency: amount for currency, amount in bybit_balance['total'].items() if amount > 0}
-    if use_binance_futures:
-        binance_balance = exchange.fetch_balance()
-        balance['binance'] = {currency: amount for currency, amount in binance_balance['total'].items() if amount > 0}
-    return render_template('index.html', balances=balance)
+@app.route('/order_info', methods=['GET'])
+def order_info():
+    global last_order_data
+    if last_order_data is None:
+        return "No open order", 400
+    else:
+        return render_template('index.html', order=last_order_data)
 
 if __name__ == '__main__':
     app.run()
