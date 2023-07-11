@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Trade Information</title>
-</head>
 <body>
-    <h1>Trade Information</h1>
-    <p>Symbol: {{ symbol }}</p>
-    <p>Quantity: {{ quantity }}</p>
-    <p>Side: {{ side }}</p>
-    <p>Profit/Loss Percentage: {{ profit_loss_percentage }}</p>
-    <img src="{{ image_url }}" alt="Symbol Image">
+
+<h2>Order Information</h2>
+
+<p>Symbol: {{ order.symbol }}</p>
+<p>Quantity: {{ order.quantity }}</p>
+<p>Profit or Loss: {{ order.profit_or_loss }}</p>
+<p>Market Side: {{ order.market_side }}</p>
+<img src="{{ order.image_url }}" alt="Symbol Image">
+
 </body>
 </html>
