@@ -7,18 +7,17 @@ from custom_http import HTTP
 
 app = Flask(__name__)
 
+# load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
 
 current_position = 'closed'
 current_side = None
-last_order_data = None
 
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
 def create_order_binance(data, exchange):
-    global last_order_data
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
@@ -37,18 +36,28 @@ def create_order_binance(data, exchange):
     else:
         raise ValueError("Invalid order type")
 
-    last_order_data = {
-        "symbol": symbol,
-        "quantity": quantity,
-        "market_side": side,
-        "image_url": "https://example.com/{}.png".format(symbol),
-        "profit_or_loss": "0%"
-    }
-
     return order
 
+def create_order_bybit(data, session):
+    symbol = data['symbol']
+    side = data['side']
+    price = data.get('price', 0)
+    quantity = data.get('quantity')
+
+    if quantity is None:
+        raise ValueError("The 'quantity' field is missing in the input data.")
+
+    order = session.post('/v2/private/order/create', json={
+        'symbol': symbol,
+        'side': side,
+        'order_type': data['type'],
+        'qty': float(quantity),
+        'price': price,
+        'time_in_force': 'GTC'
+    })
+    return order.json()
+
 def close_order_binance(data, exchange):
-    global last_order_data
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
@@ -67,12 +76,29 @@ def close_order_binance(data, exchange):
         amount=float(quantity),
         price=price
     )
-
-    last_order_data = None
-
     return order
 
-# ... تابع‌های دیگر به همان شکل که در کد اصلی شما بودند ...
+def close_order_bybit(data, session):
+    symbol = data['symbol']
+    side = data['side']
+    price = data.get('price', 0)
+    quantity = data.get('quantity')
+
+    if side not in ['closelong', 'closeshort']:
+        raise ValueError("Invalid side value for closing order. Use 'closelong' or 'closeshort'.")
+
+    if quantity is None:
+        raise ValueError("The 'quantity' field is missing in the input data.")
+
+    order = session.post('/v2/private/order/create', json={
+        'symbol': symbol,
+        'side': 'sell' if side == 'closelong' else 'buy',
+        'order_type': data['type'],
+        'qty': float(quantity),
+        'price': price,
+        'time_in_force': 'GTC'
+    })
+    return order.json()
 
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
@@ -170,14 +196,6 @@ def webhook():
         return {"status": "error", "message": str(e)}, 400
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
-
-@app.route('/order_info', methods=['GET'])
-def order_info():
-    global last_order_data
-    if last_order_data is None:
-        return "No open order", 400
-    else:
-        return render_template('index.html', order=last_order_data)
 
 if __name__ == '__main__':
     app.run()
