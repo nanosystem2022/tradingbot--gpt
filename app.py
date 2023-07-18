@@ -131,6 +131,11 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position, current_side
@@ -154,12 +159,14 @@ def webhook():
                         response = create_order_binance(data, exchange)
                         current_position = 'open'
                         current_side = data['side']
+                        socketio.emit('trade_info', response)  # ارسال اطلاعات معامله
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
                         response = close_order_binance(data, exchange)
                         current_position = 'closed'
+                        socketio.emit('trade_info', response)  # ارسال اطلاعات معامله
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
@@ -175,12 +182,14 @@ def webhook():
                         response = create_order_bybit(data, session)
                         current_position = 'open'
                         current_side = data['side']
+                        socketio.emit('trade_info', response)  # ارسال اطلاعات معامله
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
                         response = close_order_bybit(data, session)
                         current_position = 'closed'
+                        socketio.emit('trade_info', response)  # ارسال اطلاعات معامله
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
@@ -198,4 +207,4 @@ def webhook():
         return {"status": "error", "message": str(e)}, 500
 
 if __name__ == '__main__':
-    app.run()
+    socketio.run(app)
