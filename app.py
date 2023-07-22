@@ -1,18 +1,11 @@
 import json
 import os
 from flask import Flask, render_template, request, jsonify
-from flask_caching import Cache
-from werkzeug.middleware.profiler import ProfilerMiddleware
 import time
 import ccxt
 from custom_http import HTTP
 
 app = Flask(__name__)
-app.wsgi_app = ProfilerMiddleware(app.wsgi_app, profile_dir="/path/to/profiles")
-
-config = {'CACHE_TYPE': 'SimpleCache'}
-app.config.from_mapping(config)
-cache = Cache(app)
 
 # load config.json
 with open('config.json') as config_file:
@@ -24,7 +17,6 @@ current_side = None
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
-@cache.cached(timeout=50)
 def create_order_binance(data, exchange):
     symbol = data['symbol']
     order_type = data['type']
@@ -46,7 +38,22 @@ def create_order_binance(data, exchange):
 
     return order
 
-@cache.cached(timeout=50)
+def create_spot_order_binance(data, exchange):
+    symbol = data['symbol']
+    order_type = data['type']
+    side = data['side']
+    quantity = data['quantity']
+
+    if order_type == "market":
+        order = exchange.create_market_order(symbol, side, quantity)
+    elif order_type == "limit":
+        price = data['price']
+        order = exchange.create_limit_order(symbol, side, quantity, price)
+    else:
+        raise ValueError("Invalid order type")
+
+    return order
+
 def create_order_bybit(data, session):
     symbol = data['symbol']
     side = data['side']
@@ -66,7 +73,6 @@ def create_order_bybit(data, session):
     })
     return order.json()
 
-@cache.cached(timeout=50)
 def close_order_binance(data, exchange):
     symbol = data['symbol']
     side = data['side']
@@ -88,7 +94,6 @@ def close_order_binance(data, exchange):
     )
     return order
 
-@cache.cached(timeout=50)
 def close_order_bybit(data, session):
     symbol = data['symbol']
     side = data['side']
@@ -113,6 +118,7 @@ def close_order_bybit(data, session):
 
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
+use_binance_spot = is_exchange_enabled('BINANCE-SPOT')
 
 if use_bybit:
     print("Bybit is enabled!")
@@ -135,12 +141,21 @@ if use_binance_futures:
                 'public': 'https://testnet.binancefuture.com/fapi/v1',
                 'private': 'https://testnet.binancefuture.com/fapi/v1',
             },
-       
         }
     })
 
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
+
+if use_binance_spot:
+    print("Binance Spot is enabled!")
+    exchange_spot = ccxt.binance({
+        'apiKey': config['EXCHANGES']['BINANCE-SPOT']['API_KEY'],
+        'secret': config['EXCHANGES']['BINANCE-SPOT']['API_SECRET'],
+        'options': {
+            'defaultType': 'spot',
+        }
+    })
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -179,6 +194,21 @@ def webhook():
             else:
                 raise ValueError("Binance Futures is not enabled in the config file.")
 
+        elif data['exchange'] == 'binance-spot':
+            if use_binance_spot:
+                if data['side'] in ['buy', 'sell']:
+                    if current_position == 'closed':
+                        response = create_spot_order_binance(data, exchange_spot)
+                        current_position = 'open'
+                        current_side = data['side']
+                    else:
+                        raise ValueError("Cannot open a new order until the current one is closed.")
+                else:
+                    raise ValueError("Invalid side value. Use 'buy' or 'sell'.")
+                return {"status": "success", "data": response}, 200
+            else:
+                raise ValueError("Binance Spot is not enabled in the config file.")
+
         elif data['exchange'] == 'bybit':
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
@@ -209,17 +239,4 @@ def webhook():
         return {"status": "error", "message": str(e)}, 500
 
 if __name__ == '__main__':
-    from gunicorn.app.base import BaseApplication
-
-    class FlaskApplication(BaseApplication):
-        def init(self, parser, opts, args):
-            return {
-                'bind': '{0}:{1}'.format('127.0.0.1', '8000'),
-                'workers': 1,
-            }
-
-        def load(self):
-            return app
-
-    application = FlaskApplication()
-    application.run()
+    app.run()
