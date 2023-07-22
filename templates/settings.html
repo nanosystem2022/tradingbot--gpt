@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Configuration</title>
+</head>
+<body>
+    <form action="/update_config" method="post">
+        <label for="key">Key:</label><br>
+        <input type="text" id="key" name="key" value="{{ config['KEY'] }}"><br>
+        <label for="bybit_enabled">Bybit Enabled:</label><br>
+        <input type="checkbox" id="bybit_enabled" name="bybit_enabled" {% if config['EXCHANGES']['BYBIT']['ENABLED'] %}checked{% endif %}><br>
+        <!-- Add more inputs for other settings as needed -->
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>
