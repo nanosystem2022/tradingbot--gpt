@@ -4,8 +4,10 @@ from flask import Flask, render_template, request, jsonify
 import time
 import ccxt
 from custom_http import HTTP
+from flask_caching import Cache
 
 app = Flask(__name__)
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 # load config.json
 with open('config.json') as config_file:
@@ -17,7 +19,7 @@ current_side = None
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
-def create_order_binance(data, exchange):
+def create_order(data, exchange, session):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
@@ -38,26 +40,7 @@ def create_order_binance(data, exchange):
 
     return order
 
-def create_order_bybit(data, session):
-    symbol = data['symbol']
-    side = data['side']
-    price = data.get('price', 0)
-    quantity = data.get('quantity')
-
-    if quantity is None:
-        raise ValueError("The 'quantity' field is missing in the input data.")
-
-    order = session.post('/v2/private/order/create', json={
-        'symbol': symbol,
-        'side': side,
-        'order_type': data['type'],
-        'qty': float(quantity),
-        'price': price,
-        'time_in_force': 'GTC'
-    })
-    return order.json()
-
-def close_order_binance(data, exchange):
+def close_order(data, exchange, session):
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
@@ -77,28 +60,6 @@ def close_order_binance(data, exchange):
         price=price
     )
     return order
-
-def close_order_bybit(data, session):
-    symbol = data['symbol']
-    side = data['side']
-    price = data.get('price', 0)
-    quantity = data.get('quantity')
-
-    if side not in ['closelong', 'closeshort']:
-        raise ValueError("Invalid side value for closing order. Use 'closelong' or 'closeshort'.")
-
-    if quantity is None:
-        raise ValueError("The 'quantity' field is missing in the input data.")
-
-    order = session.post('/v2/private/order/create', json={
-        'symbol': symbol,
-        'side': 'sell' if side == 'closelong' else 'buy',
-        'order_type': data['type'],
-        'qty': float(quantity),
-        'price': price,
-        'time_in_force': 'GTC'
-    })
-    return order.json()
 
 use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
@@ -131,12 +92,8 @@ if use_binance_futures:
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
         exchange.set_sandbox_mode(True)
 
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
 @app.route('/webhook', methods=['POST'])
+@cache.cached(timeout=50)
 def webhook():
     global current_position, current_side
     print("Hook Received!")
@@ -156,17 +113,15 @@ def webhook():
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
                     if current_position == 'closed':
-                        response = create_order_binance(data, exchange)
+                        response = create_order(data, exchange, session)
                         current_position = 'open'
                         current_side = data['side']
-                        socketio.emit('trade_info', response)  # ارسال اطلاعات معامله
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
-                        response = close_order_binance(data, exchange)
+                        response = close_order(data, exchange, session)
                         current_position = 'closed'
-                        socketio.emit('trade_info', response)  # ارسال اطلاعات معامله
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
@@ -179,17 +134,15 @@ def webhook():
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
                     if current_position == 'closed':
-                        response = create_order_bybit(data, session)
+                        response = create_order(data, exchange, session)
                         current_position = 'open'
                         current_side = data['side']
-                        socketio.emit('trade_info', response)  # ارسال اطلاعات معامله
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if current_position == 'open' and ((current_side == 'buy' and data['side'] == 'closelong') or (current_side == 'sell' and data['side'] == 'closeshort')):
-                        response = close_order_bybit(data, session)
+                        response = close_order(data, exchange, session)
                         current_position = 'closed'
-                        socketio.emit('trade_info', response)  # ارسال اطلاعات معامله
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
@@ -207,4 +160,5 @@ def webhook():
         return {"status": "error", "message": str(e)}, 500
 
 if __name__ == '__main__':
-    socketio.run(app)
+    from gunicorn.app.wsgiapp import run
+    run()
