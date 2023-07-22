@@ -3,4 +3,4 @@ flask-caching
 ccxt
 gunicorn
 requests
-flask_socketio
+Werkzeug
