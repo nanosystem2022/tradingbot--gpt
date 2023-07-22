@@ -1,5 +1,6 @@
 Flask
+flask-caching
 ccxt
 gunicorn
-flask_socketio
 requests
+flask_socketio
