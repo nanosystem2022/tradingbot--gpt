@@ -13,20 +13,27 @@ with open('config.json') as config_file:
 
 current_position = 'closed'
 current_side = None
+current_order_quantity = None  # global variable to store the current order quantity
 
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
 def create_order(data, exchange):
+    global current_order_quantity
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
-    quantity = data['quantity']
+    percentage = data['percentage']  # changed from 'percentage_of_balance'
 
     if side == "closelong":
         side = "sell"
     elif side == "closeshort":
         side = "buy"
+
+    balance = exchange.fetch_balance()
+    total_balance = balance['total']['USDT']  # replace 'USDT' with your currency
+    quantity = total_balance * (percentage / 100)  # calculate the quantity based on the balance and the percentage
+    current_order_quantity = quantity  # store the quantity
 
     if order_type == "market":
         order = exchange.create_market_order(symbol, side, quantity)
@@ -39,10 +46,11 @@ def create_order(data, exchange):
     return order
 
 def close_order(data, exchange):
+    global current_order_quantity
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
-    quantity = data.get('quantity')
+    quantity = current_order_quantity  # use the stored quantity
 
     if side not in ['closelong', 'closeshort']:
         raise ValueError("Invalid side value for closing order. Use 'closelong' or 'closeshort'.")
@@ -57,6 +65,7 @@ def close_order(data, exchange):
         amount=float(quantity),
         price=price
     )
+    current_order_quantity = None  # reset the stored quantity
     return order
 
 def handle_error(e):
