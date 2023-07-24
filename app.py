@@ -7,18 +7,13 @@ from custom_http import HTTP
 
 app = Flask(__name__)
 
-# Define the percent of balance to use for each order
-PERCENT_OF_BALANCE = 0.9  # Use 10% of balance for each order
-
-# Define the currency to calculate the balance
-BALANCE_CURRENCY = 'USDT'
-
 # load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
 
 current_position = 'closed'
 current_side = None
+TRADE_PERCENTAGE = 50  # The percentage of your balance that you want to trade
 
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
@@ -33,8 +28,11 @@ def create_order(data, exchange):
     elif side == "closeshort":
         side = "buy"
 
-    balance = exchange.fetch_balance()  # fetch the balance
-    quantity = balance['total'][BALANCE_CURRENCY] * PERCENT_OF_BALANCE  # calculate the quantity based on the percent of balance
+    # calculate the quantity based on the percentage of the balance
+    balance = exchange.fetch_balance()
+    base_currency = symbol.split('/')[0]
+    total_balance = balance['total'][base_currency]
+    quantity = total_balance * (TRADE_PERCENTAGE / 100)
 
     if order_type == "market":
         order = exchange.create_market_order(symbol, side, quantity)
@@ -51,8 +49,16 @@ def close_order(data, exchange):
     side = data['side']
     price = data.get('price', 0)
 
-    open_orders = exchange.fetch_open_orders(symbol)  # fetch the open orders
-    quantity = sum(order['amount'] for order in open_orders)  # calculate the total quantity of open orders
+    # get the total amount of the base currency that you have
+    balance = exchange.fetch_balance()
+    base_currency = symbol.split('/')[0]
+    quantity = balance['total'][base_currency]
+
+    if side not in ['closelong', 'closeshort']:
+        raise ValueError("Invalid side value for closing order. Use 'closelong' or 'closeshort'.")
+
+    if quantity is None:
+        raise ValueError("The 'quantity' field is missing in the input data.")
 
     order = exchange.create_order(
         symbol=symbol,
@@ -62,7 +68,6 @@ def close_order(data, exchange):
         price=price
     )
     return order
-
 
 def handle_error(e):
     return {"status": "error", "message": str(e)}, 400 if isinstance(e, ValueError) else 500
