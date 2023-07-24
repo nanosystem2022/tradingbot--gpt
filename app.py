@@ -7,33 +7,34 @@ from custom_http import HTTP
 
 app = Flask(__name__)
 
+# Define the percent of balance to use for each order
+PERCENT_OF_BALANCE = 0.9  # Use 10% of balance for each order
+
+# Define the currency to calculate the balance
+BALANCE_CURRENCY = 'USDT'
+
 # load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
 
 current_position = 'closed'
 current_side = None
-current_order_quantity = None  # global variable to store the current order quantity
 
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
 def create_order(data, exchange):
-    global current_order_quantity
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
-    percentage = data['percentage']  # changed from 'percentage_of_balance'
 
     if side == "closelong":
         side = "sell"
     elif side == "closeshort":
         side = "buy"
 
-    balance = exchange.fetch_balance()
-    total_balance = balance['total']['USDT']  # replace 'USDT' with your currency
-    quantity = total_balance * (percentage / 100)  # calculate the quantity based on the balance and the percentage
-    current_order_quantity = quantity  # store the quantity
+    balance = exchange.fetch_balance()  # fetch the balance
+    quantity = balance['total'][BALANCE_CURRENCY] * PERCENT_OF_BALANCE  # calculate the quantity based on the percent of balance
 
     if order_type == "market":
         order = exchange.create_market_order(symbol, side, quantity)
@@ -46,17 +47,12 @@ def create_order(data, exchange):
     return order
 
 def close_order(data, exchange):
-    global current_order_quantity
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
-    quantity = current_order_quantity  # use the stored quantity
 
-    if side not in ['closelong', 'closeshort']:
-        raise ValueError("Invalid side value for closing order. Use 'closelong' or 'closeshort'.")
-
-    if quantity is None:
-        raise ValueError("The 'quantity' field is missing in the input data.")
+    open_orders = exchange.fetch_open_orders(symbol)  # fetch the open orders
+    quantity = sum(order['amount'] for order in open_orders)  # calculate the total quantity of open orders
 
     order = exchange.create_order(
         symbol=symbol,
@@ -65,8 +61,8 @@ def close_order(data, exchange):
         amount=float(quantity),
         price=price
     )
-    current_order_quantity = None  # reset the stored quantity
     return order
+
 
 def handle_error(e):
     return {"status": "error", "message": str(e)}, 400 if isinstance(e, ValueError) else 500
