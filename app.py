@@ -13,7 +13,6 @@ with open('config.json') as config_file:
 
 current_position = 'closed'
 current_side = None
-TRADE_PERCENTAGE = 50  # The percentage of your balance that you want to trade
 
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
@@ -22,17 +21,15 @@ def create_order(data, exchange):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
+    # Fetch balance
+    balance = exchange.fetch_balance()
+    # Calculate quantity based on the percentage of the total balance you want to use for each trade
+    quantity = balance['total']['USDT'] * 0.9  # Replace 'BTC' with the symbol of the currency you are trading
 
     if side == "closelong":
         side = "sell"
     elif side == "closeshort":
         side = "buy"
-
-    # calculate the quantity based on the percentage of the balance
-    balance = exchange.fetch_balance()
-    base_currency = symbol.split('/')[0]
-    total_balance = balance['total'][base_currency]
-    quantity = total_balance * (TRADE_PERCENTAGE / 100)
 
     if order_type == "market":
         order = exchange.create_market_order(symbol, side, quantity)
@@ -48,11 +45,10 @@ def close_order(data, exchange):
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
-
-    # get the total amount of the base currency that you have
-    balance = exchange.fetch_balance()
-    base_currency = symbol.split('/')[0]
-    quantity = balance['total'][base_currency]
+    # Fetch open orders
+    open_orders = exchange.fetch_open_orders(symbol)
+    # Calculate the total quantity of open orders
+    quantity = sum(order['amount'] for order in open_orders)
 
     if side not in ['closelong', 'closeshort']:
         raise ValueError("Invalid side value for closing order. Use 'closelong' or 'closeshort'.")
