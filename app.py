@@ -21,10 +21,15 @@ def create_order(data, exchange):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
+
     # Fetch balance
     balance = exchange.fetch_balance()
-    # Calculate quantity based on the percentage of the total balance you want to use for each trade
-    quantity = balance['total']['USDT'] * 100  # Replace 'BTC' with the symbol of the currency you are trading
+    # Get the balance of the base currency
+    base_currency = symbol.split('/')[0]
+    balance_base_currency = balance['total'][base_currency]
+    # Set the quantity as a percentage of the balance
+    percentage_of_balance = config['TRADE_PERCENTAGE']  # Read the percentage from the config
+    quantity = balance_base_currency * percentage_of_balance
 
     if side == "closelong":
         side = "sell"
