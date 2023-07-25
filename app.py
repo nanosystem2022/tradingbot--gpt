@@ -50,10 +50,7 @@ def close_order(data, exchange):
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
-    # Fetch open orders
-    open_orders = exchange.fetch_open_orders(symbol)
-    # Calculate the total quantity of open orders
-    quantity = sum(order['amount'] for order in open_orders)
+    quantity = data.get('quantity')
 
     if side not in ['closelong', 'closeshort']:
         raise ValueError("Invalid side value for closing order. Use 'closelong' or 'closeshort'.")
