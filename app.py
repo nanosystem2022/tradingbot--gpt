@@ -52,9 +52,9 @@ def close_order(data, exchange):
     price = data.get('price', 0)
 
     # Fetch open position
-    position = exchange.fetch_position(symbol)
+    position = exchange.fapiPrivate_get_positionRisk()
     # Get the quantity of the current order
-    quantity = position['info']['positionAmt']
+    quantity = [x for x in position if x['symbol'] == symbol][0]['positionAmt']
 
     if quantity is None:
         raise ValueError("No open order found.")
