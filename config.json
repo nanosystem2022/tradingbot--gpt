@@ -1,6 +1,5 @@
 {
     "KEY": 12345,
-    "TRADE_PERCENTAGE": 1.0,
     "EXCHANGES": {
          "BYBIT": {
               "API_KEY": "api-key-goes-here",
