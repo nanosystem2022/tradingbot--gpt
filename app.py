@@ -7,6 +7,10 @@ from custom_http import HTTP
 
 app = Flask(__name__)
 
+# Define your base currency and the percentage of your balance to use for each trade
+base_currency = 'USDT'
+trade_percentage = 1.0  # 100%
+
 # load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
@@ -17,13 +21,55 @@ current_side = None
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
-def create_order_with_percentage(exchange, symbol, side, percentage):
+def create_order(data, exchange):
+    symbol = data['symbol']
+    order_type = data['type']
+    side = data['side']
+
+    # Fetch balance
     balance = exchange.fetch_balance()
-    if symbol.split("/")[1] in balance['total']:
-        quantity = balance['total'][symbol.split("/")[1]] * (percentage / 100)
+    # Calculate quantity based on the percentage of the balance
+    quantity = balance['total'][base_currency] * trade_percentage
+
+    if side == "closelong":
+        side = "sell"
+    elif side == "closeshort":
+        side = "buy"
+
+    if order_type == "market":
+        order = exchange.create_market_order(symbol, side, quantity)
+    elif order_type == "limit":
+        price = data['price']
+        order = exchange.create_limit_order(symbol, side, quantity, price)
     else:
-        raise ValueError("Symbol not found in balance.")
-    order = exchange.create_market_order(symbol, side, quantity)
+        raise ValueError("Invalid order type")
+
+    return order
+
+def close_order(data, exchange):
+    symbol = data['symbol']
+    side = data['side']
+    price = data.get('price', 0)
+
+    # Fetch open orders
+    open_orders = exchange.fetch_open_orders(symbol)
+    # Get the quantity of the current order
+    quantity = None
+    for order in open_orders:
+        if order['side'] == side:
+            quantity = order['amount']
+            break
+
+    if quantity is None:
+        raise ValueError("No open order found.")
+
+    order = exchange.create_order(
+        symbol=symbol,
+        type=data['type'],
+        side='sell' if side == 'closelong' else 'buy',
+        amount=float(quantity),
+        price=price
+    )
     return order
 
 def handle_error(e):
@@ -96,14 +142,14 @@ def webhook():
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(exchange, data['symbol'], data['side'], 50)
+                        response = create_order(data, exchange)
                         current_position = 'open'
                         current_side = data['side']
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if can_close_order(current_position, current_side, data['side']):
-                        response = create_order_with_percentage(exchange, data['symbol'], 'sell' if data['side'] == 'closelong' else 'buy', 100)
+                        response = close_order(data, exchange)
                         current_position = 'closed'
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
@@ -117,7 +163,7 @@ def webhook():
             if use_binance_spot:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(exchange_spot, data['symbol'], data['side'], 50)
+                        response = create_order(data, exchange_spot)
                         current_position = 'open'
                         current_side = data['side']
                     else:
@@ -132,14 +178,14 @@ def webhook():
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(session, data['symbol'], data['side'], 50)
+                        response = create_order_bybit(data, session)
                         current_position = 'open'
                         current_side = data['side']
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if can_close_order(current_position, current_side, data['side']):
-                        response = create_order_with_percentage(session, data['symbol'], 'sell' if data['side'] == 'closelong' else 'buy', 100)
+                        response = close_order_bybit(data, session)
                         current_position = 'closed'
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
