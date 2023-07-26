@@ -133,6 +133,13 @@ def webhook():
         }, 400
 
     try:
+        # Your existing code here...
+    except Exception as e:
+        app.logger.error(f"Error occurred: {e}")
+        return handle_error(e)
+
+
+    try:
         if data['exchange'] == 'binance-futures':
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
