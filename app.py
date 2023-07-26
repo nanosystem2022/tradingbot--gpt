@@ -17,21 +17,13 @@ current_side = None
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
-def get_balance(exchange, symbol):
+def create_order_with_percentage(exchange, symbol, side, percentage):
     balance = exchange.fetch_balance()
-    return balance['total'][symbol.split('/')[1]]
-
-def create_order_with_percentage(exchange, symbol, side, percentage, order_type='market', price=None):
-    total_balance = get_balance(exchange, symbol.split('/')[1])
-    quantity = total_balance * percentage / 100
-
-    if order_type == 'market':
-        order = exchange.create_market_order(symbol, side, quantity)
-    elif order_type == 'limit' and price is not None:
-        order = exchange.create_limit_order(symbol, side, quantity, price)
+    if symbol.split("/")[1] in balance['total']:
+        quantity = balance['total'][symbol.split("/")[1]] * (percentage / 100)
     else:
-        raise ValueError("Invalid order type or price for limit order is missing")
-
+        raise ValueError("Symbol not found in balance.")
+    order = exchange.create_market_order(symbol, side, quantity)
     return order
 
 def handle_error(e):
@@ -104,7 +96,6 @@ def webhook():
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        # Here we use the new function and specify 50% of the balance
                         response = create_order_with_percentage(exchange, data['symbol'], data['side'], 50)
                         current_position = 'open'
                         current_side = data['side']
@@ -112,7 +103,6 @@ def webhook():
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if can_close_order(current_position, current_side, data['side']):
-                        # Here we use the new function and specify 100% of the balance to close the entire position
                         response = create_order_with_percentage(exchange, data['symbol'], 'sell' if data['side'] == 'closelong' else 'buy', 100)
                         current_position = 'closed'
                     else:
@@ -164,7 +154,6 @@ def webhook():
 
     except Exception as e:
         return handle_error(e)
-
 
 if __name__ == '__main__':
     app.run()
