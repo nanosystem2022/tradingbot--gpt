@@ -7,10 +7,6 @@ from custom_http import HTTP
 
 app = Flask(__name__)
 
-# Define your base currency and the percentage of your balance to use for each trade
-base_currency = 'USDT'
-trade_percentage = 1.0  # 100%
-
 # load config.json
 with open('config.json') as config_file:
     config = json.load(config_file)
@@ -25,11 +21,7 @@ def create_order(data, exchange):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
-
-    # Fetch balance
-    balance = exchange.fetch_balance()
-    # Calculate quantity based on the percentage of the balance
-    quantity = balance['total'][base_currency] * trade_percentage
+    quantity = data['quantity']
 
     if side == "closelong":
         side = "sell"
@@ -50,14 +42,13 @@ def close_order(data, exchange):
     symbol = data['symbol']
     side = data['side']
     price = data.get('price', 0)
+    quantity = data.get('quantity')
 
-    # Fetch open position
-    position = exchange.fapiPrivate_get_positionRisk()
-    # Get the quantity of the current order
-    quantity = [x for x in position if x['symbol'] == symbol][0]['positionAmt']
+    if side not in ['closelong', 'closeshort']:
+        raise ValueError("Invalid side value for closing order. Use 'closelong' or 'closeshort'.")
 
     if quantity is None:
-        raise ValueError("No open order found.")
+        raise ValueError("The 'quantity' field is missing in the input data.")
 
     order = exchange.create_order(
         symbol=symbol,
@@ -81,9 +72,12 @@ use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
 use_binance_spot = is_exchange_enabled('BINANCE-SPOT')
 
+# Create a dictionary of enabled exchanges
+exchanges = {}
+
 if use_bybit:
     print("Bybit is enabled!")
-    session = HTTP(
+    exchanges['bybit'] = HTTP(
         endpoint='https://api.bybit.com',
         api_key=config['EXCHANGES']['BYBIT']['API_KEY'],
         api_secret=config['EXCHANGES']['BYBIT']['API_SECRET']
@@ -91,7 +85,7 @@ if use_bybit:
 
 if use_binance_futures:
     print("Binance is enabled!")
-    exchange = ccxt.binance({
+    exchanges['binance-futures'] = ccxt.binance({
         'apiKey': config['EXCHANGES']['BINANCE-FUTURES']['API_KEY'],
         'secret': config['EXCHANGES']['BINANCE-FUTURES']['API_SECRET'],
         'options': {
@@ -106,11 +100,11 @@ if use_binance_futures:
     })
 
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
-        exchange.set_sandbox_mode(True)
+        exchanges['binance-futures'].set_sandbox_mode(True)
 
 if use_binance_spot:
     print("Binance Spot is enabled!")
-    exchange_spot = ccxt.binance({
+    exchanges['binance-spot'] = ccxt.binance({
         'apiKey': config['EXCHANGES']['BINANCE-SPOT']['API_KEY'],
         'secret': config['EXCHANGES']['BINANCE-SPOT']['API_SECRET'],
         'options': {
@@ -134,6 +128,11 @@ def webhook():
         }, 400
 
     try:
+        exchange_name = data['exchange']
+        if exchange_name not in exchanges:
+            raise ValueError(f"{exchange_name} is not enabled in the config file.")
+
+        exchange = exchanges[exchange_name]    try:
         if data['exchange'] == 'binance-futures':
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
@@ -196,6 +195,5 @@ def webhook():
 
     except Exception as e:
         return handle_error(e)
-
 if __name__ == '__main__':
     app.run()
