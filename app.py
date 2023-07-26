@@ -128,72 +128,54 @@ def webhook():
         }, 400
 
     try:
-        exchange_name = data['exchange']
-        if exchange_name not in exchanges:
-            raise ValueError(f"{exchange_name} is not enabled in the config file.")
-
-        exchange = exchanges[exchange_name]    try:
-        if data['exchange'] == 'binance-futures':
-            if use_binance_futures:
-                if data['side'] in ['buy', 'sell']:
-                    if can_open_order(current_position):
-                        response = create_order(data, exchange)
-                        current_position = 'open'
-                        current_side = data['side']
-                    else:
-                        raise ValueError("Cannot open a new order until the current one is closed.")
-                elif data['side'] in ['closelong', 'closeshort']:
-                    if can_close_order(current_position, current_side, data['side']):
-                        response = close_order(data, exchange)
-                        current_position = 'closed'
-                    else:
-                        raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
+        if use_binance_futures:
+            if data['side'] in ['buy', 'sell']:
+                if can_open_order(current_position):
+                    response = create_order(data, exchange)
+                    current_position = 'open'
+                    current_side = data['side']
                 else:
-                    raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-                return {"status": "success", "data": response}, 200
-            else:
-                raise ValueError("Binance Futures is not enabled in the config file.")
-
-        elif data['exchange'] == 'binance-spot':
-            if use_binance_spot:
-                if data['side'] in ['buy', 'sell']:
-                    if can_open_order(current_position):
-                        response = create_order(data, exchange_spot)
-                        current_position = 'open'
-                        current_side = data['side']
-                    else:
-                        raise ValueError("Cannot open a new order until the current one is closed.")
+                    raise ValueError("Cannot open a new order until the current one is closed.")
+            elif data['side'] in ['closelong', 'closeshort']:
+                if can_close_order(current_position, current_side, data['side']):
+                    response = close_order(data, exchange)
+                    current_position = 'closed'
                 else:
-                    raise ValueError("Invalid side value. Use 'buy' or 'sell'.")
-                return {"status": "success", "data": response}, 200
+                    raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
             else:
-                raise ValueError("Binance Spot is not enabled in the config file.")
+                raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
+            return {"status": "success", "data": response}, 200
 
-        elif data['exchange'] == 'bybit':
-            if use_bybit:
-                if data['side'] in ['buy', 'sell']:
-                    if can_open_order(current_position):
-                        response = create_order_bybit(data, session)
-                        current_position = 'open'
-                        current_side = data['side']
-                    else:
-                        raise ValueError("Cannot open a new order until the current one is closed.")
-                elif data['side'] in ['closelong', 'closeshort']:
-                    if can_close_order(current_position, current_side, data['side']):
-                        response = close_order_bybit(data, session)
-                        current_position = 'closed'
-                    else:
-                        raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
+        if use_binance_spot:
+            if data['side'] in ['buy', 'sell']:
+                if can_open_order(current_position):
+                    response = create_order(data, exchange_spot)
+                    current_position = 'open'
+                    current_side = data['side']
                 else:
-                    raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-                return {"status": "success", "data": response}, 200
+                    raise ValueError("Cannot open a new order until the current one is closed.")
             else:
-                raise ValueError("Bybit is not enabled in the config file.")
+                raise ValueError("Invalid side value. Use 'buy' or 'sell'.")
+            return {"status": "success", "data": response}, 200
 
-        else:
-            raise ValueError("Unsupported exchange.")
+        if use_bybit:
+            if data['side'] in ['buy', 'sell']:
+                if can_open_order(current_position):
+                    response = create_order_bybit(data, session)
+                    current_position = 'open'
+                    current_side = data['side']
+            elif data['side'] in ['closelong', 'closeshort']:
+                if can_close_order(current_position, current_side, data['side']):
+                    response = close_order_bybit(data, session)
+                    current_position = 'closed'
+                else:
+                    raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
+            else:
+                raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
+            return {"status": "success", "data": response}, 200
 
     except Exception as e:
         return handle_error(e)
+
 if __name__ == '__main__':
     app.run()
