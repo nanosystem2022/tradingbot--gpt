@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 # Define your base currency and the percentage of your balance to use for each trade
 base_currency = 'USDT'
-trade_percentage = 1.0  # 100%
+trade_percentage = 100.0  # 100%
 
 # load config.json
 with open('config.json') as config_file:
