@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 # Define your base currency and the percentage of your balance to use for each trade
 base_currency = 'USDT'
-trade_percentage = 100.0  # 100%
+trade_percentage = 1.0  # 100%
 
 # load config.json
 with open('config.json') as config_file:
@@ -51,14 +51,10 @@ def close_order(data, exchange):
     side = data['side']
     price = data.get('price', 0)
 
-    # Fetch open orders
-    open_orders = exchange.fetch_open_orders(symbol)
+    # Fetch open position
+    position = exchange.fetch_position(symbol)
     # Get the quantity of the current order
-    quantity = None
-    for order in open_orders:
-        if order['side'] == side:
-            quantity = order['amount']
-            break
+    quantity = position['info']['positionAmt']
 
     if quantity is None:
         raise ValueError("No open order found.")
