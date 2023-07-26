@@ -72,12 +72,9 @@ use_bybit = is_exchange_enabled('BYBIT')
 use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
 use_binance_spot = is_exchange_enabled('BINANCE-SPOT')
 
-# Create a dictionary of enabled exchanges
-exchanges = {}
-
 if use_bybit:
     print("Bybit is enabled!")
-    exchanges['bybit'] = HTTP(
+    session = HTTP(
         endpoint='https://api.bybit.com',
         api_key=config['EXCHANGES']['BYBIT']['API_KEY'],
         api_secret=config['EXCHANGES']['BYBIT']['API_SECRET']
@@ -85,7 +82,7 @@ if use_bybit:
 
 if use_binance_futures:
     print("Binance is enabled!")
-    exchanges['binance-futures'] = ccxt.binance({
+    exchange = ccxt.binance({
         'apiKey': config['EXCHANGES']['BINANCE-FUTURES']['API_KEY'],
         'secret': config['EXCHANGES']['BINANCE-FUTURES']['API_SECRET'],
         'options': {
@@ -100,11 +97,11 @@ if use_binance_futures:
     })
 
     if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
-        exchanges['binance-futures'].set_sandbox_mode(True)
+        exchange.set_sandbox_mode(True)
 
 if use_binance_spot:
     print("Binance Spot is enabled!")
-    exchanges['binance-spot'] = ccxt.binance({
+    exchange_spot = ccxt.binance({
         'apiKey': config['EXCHANGES']['BINANCE-SPOT']['API_KEY'],
         'secret': config['EXCHANGES']['BINANCE-SPOT']['API_SECRET'],
         'options': {
@@ -176,6 +173,7 @@ def webhook():
 
     except Exception as e:
         return handle_error(e)
+
 
 if __name__ == '__main__':
     app.run()
