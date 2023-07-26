@@ -174,6 +174,5 @@ def webhook():
     except Exception as e:
         return handle_error(e)
 
-
 if __name__ == '__main__':
     app.run()
