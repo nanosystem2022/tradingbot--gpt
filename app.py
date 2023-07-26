@@ -23,7 +23,7 @@ def create_order(data, exchange):
     side = data['side']
     balance = exchange.fetch_balance()
     free_usdt = balance['USDT']['free']
-    quantity = free_usdt * 0.5  # 50% of free balance
+    quantity = free_usdt * 1.0  # 50% of free balance
 
     if side == "closelong":
         side = "sell"
