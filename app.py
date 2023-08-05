@@ -17,13 +17,17 @@ current_side = None
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
-def create_order(data, exchange):
+def create_order_with_percentage(data, exchange, percentage):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
+
+    # Fetch balance
     balance = exchange.fetch_balance()
-    free_usdt = balance['USDT']['free']
-    quantity = free_usdt * 10.0  # 50% of free balance
+    usdt_balance = balance['total']['USDT']
+
+    # Calculate quantity based on the specified percentage
+    quantity = (usdt_balance * percentage) / 100
 
     if side == "closelong":
         side = "sell"
@@ -111,7 +115,7 @@ if use_binance_spot:
         }
     })
 
-@app.route('/webhook1', methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position, current_side
     print("Hook Received!")
@@ -131,7 +135,7 @@ def webhook():
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order(data, exchange)
+                        response = create_order_with_percentage(data, exchange, 50)  # Use 50% of balance
                         current_position = 'open'
                         current_side = data['side']
                     else:
@@ -152,7 +156,7 @@ def webhook():
             if use_binance_spot:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order(data, exchange_spot)
+                        response = create_order_with_percentage(data, exchange_spot, 50)  # Use 50% of balance
                         current_position = 'open'
                         current_side = data['side']
                     else:
@@ -167,7 +171,7 @@ def webhook():
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order(data, session)
+                        response = create_order_with_percentage(data, session, 50)  # Use 50% of balance
                         current_position = 'open'
                         current_side = data['side']
                     else:
