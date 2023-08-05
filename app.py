@@ -14,25 +14,28 @@ with open('config.json') as config_file:
 current_position = 'closed'
 current_side = None
 
+def calculate_order_quantity(exchange, percentage):
+    balance = exchange.fetch_balance()
+    usdt_balance = balance['total']['USDT']
+    order_quantity = usdt_balance * (percentage / 100.0)
+    return order_quantity
+
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
-def create_order_with_percentage(data, exchange, percentage):
+def create_order(data, exchange):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
-
-    # Fetch balance
-    balance = exchange.fetch_balance()
-    usdt_balance = balance['total']['USDT']
-
-    # Calculate quantity based on the specified percentage
-    quantity = (usdt_balance * percentage) / 100
+    percentage = data.get('percentage', 100)  # Get the percentage from the data, if not provided, use 100%
 
     if side == "closelong":
         side = "sell"
     elif side == "closeshort":
         side = "buy"
+
+    # Calculate the quantity based on the percentage of the total USDT balance
+    quantity = calculate_order_quantity(exchange, percentage)
 
     if order_type == "market":
         order = exchange.create_market_order(symbol, side, quantity)
@@ -115,7 +118,7 @@ if use_binance_spot:
         }
     })
 
-@app.route('/webhook1', methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position, current_side
     print("Hook Received!")
@@ -135,7 +138,7 @@ def webhook():
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(data, exchange, 100)  # Use 50% of balance
+                        response = create_order(data, exchange)
                         current_position = 'open'
                         current_side = data['side']
                     else:
@@ -156,7 +159,7 @@ def webhook():
             if use_binance_spot:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(data, exchange_spot, 100)  # Use 50% of balance
+                        response = create_order(data, exchange_spot)
                         current_position = 'open'
                         current_side = data['side']
                     else:
@@ -171,14 +174,14 @@ def webhook():
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(data, session, 100)  # Use 50% of balance
+                        response = create_order_bybit(data, session)
                         current_position = 'open'
                         current_side = data['side']
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if can_close_order(current_position, current_side, data['side']):
-                        response = close_order(data, session)
+                        response = close_order_bybit(data, session)
                         current_position = 'closed'
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
