@@ -14,28 +14,32 @@ with open('config.json') as config_file:
 current_position = 'closed'
 current_side = None
 
-def calculate_order_quantity(exchange, percentage):
-    balance = exchange.fetch_balance()
-    usdt_balance = balance['total']['USDT']
-    order_quantity = usdt_balance * (percentage / 100.0)
-    return order_quantity
-
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
+
+def get_balance(exchange, currency='USDT'):
+    """Get balance of a specific currency from the exchange"""
+    balance = exchange.fetch_balance()
+    return balance['total'][currency]
+
+def calculate_trade_amount(exchange, percentage, currency='USDT'):
+    """Calculate the amount of currency to be used for trading based on the specified percentage"""
+    balance = get_balance(exchange, currency)
+    return balance * (percentage / 100.0)
 
 def create_order(data, exchange):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
-    percentage = data.get('percentage', 100)  # Get the percentage from the data, if not provided, use 100%
+    percentage = data.get('percentage', 100)  # get the percentage from data, if not provided, use 100%
 
     if side == "closelong":
         side = "sell"
     elif side == "closeshort":
         side = "buy"
 
-    # Calculate the quantity based on the percentage of the total USDT balance
-    quantity = calculate_order_quantity(exchange, percentage)
+    # calculate the amount based on the balance and the specified percentage
+    quantity = calculate_trade_amount(exchange, percentage)
 
     if order_type == "market":
         order = exchange.create_market_order(symbol, side, quantity)
@@ -118,7 +122,7 @@ if use_binance_spot:
         }
     })
 
-@app.route('/webhook', methods=['POST'])
+@app.route('/webhook1', methods=['POST'])
 def webhook():
     global current_position, current_side
     print("Hook Received!")
