@@ -135,7 +135,7 @@ def webhook():
             if use_binance_futures:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(data, exchange, 50)  # Use 50% of balance
+                        response = create_order_with_percentage(data, exchange, 100)  # Use 50% of balance
                         current_position = 'open'
                         current_side = data['side']
                     else:
@@ -156,7 +156,7 @@ def webhook():
             if use_binance_spot:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(data, exchange_spot, 50)  # Use 50% of balance
+                        response = create_order_with_percentage(data, exchange_spot, 100)  # Use 50% of balance
                         current_position = 'open'
                         current_side = data['side']
                     else:
@@ -171,7 +171,7 @@ def webhook():
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_with_percentage(data, session, 50)  # Use 50% of balance
+                        response = create_order_with_percentage(data, session, 100)  # Use 50% of balance
                         current_position = 'open'
                         current_side = data['side']
                     else:
