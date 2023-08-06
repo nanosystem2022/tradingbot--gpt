@@ -17,35 +17,29 @@ current_side = None
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
-def get_balance(exchange, currency='USDT'):
-    """Get balance of a specific currency from the exchange"""
-    balance = exchange.fetch_balance()
-    return balance['total'][currency]
-
-def calculate_trade_amount(exchange, percentage, currency='USDT'):
-    """Calculate the amount of currency to be used for trading based on the specified percentage"""
-    balance = get_balance(exchange, currency)
-    return balance * (percentage / 100.0)
-
 def create_order(data, exchange):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
-    percentage = data.get('percentage', 100)  # get the percentage from data, if not provided, use 100%
+    quantity = data['quantity']
+
+    params = {}  # Initial parameters
+
+    # Add leverage only if the exchange supports it
+    if data['exchange'].upper() in ['BYBIT', 'BINANCE-FUTURES']:
+        leverage = config['EXCHANGES'][data['exchange'].upper()]['LEVERAGE']
+        params['leverage'] = leverage
 
     if side == "closelong":
         side = "sell"
     elif side == "closeshort":
         side = "buy"
 
-    # calculate the amount based on the balance and the specified percentage
-    quantity = calculate_trade_amount(exchange, percentage)
-
     if order_type == "market":
-        order = exchange.create_market_order(symbol, side, quantity)
+        order = exchange.create_market_order(symbol, side, quantity, params=params)
     elif order_type == "limit":
         price = data['price']
-        order = exchange.create_limit_order(symbol, side, quantity, price)
+        order = exchange.create_limit_order(symbol, side, quantity, price, params=params)
     else:
         raise ValueError("Invalid order type")
 
@@ -178,14 +172,14 @@ def webhook():
             if use_bybit:
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order_bybit(data, session)
+                        response = create_order(data, session)
                         current_position = 'open'
                         current_side = data['side']
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if can_close_order(current_position, current_side, data['side']):
-                        response = close_order_bybit(data, session)
+                        response = close_order(data, session)
                         current_position = 'closed'
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
