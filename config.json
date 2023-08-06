@@ -5,14 +5,16 @@
               "API_KEY": "api-key-goes-here",
               "API_SECRET": "api-secret-goes-here",
               "ENABLED": false,
-              "MODE": "futures"
+              "MODE": "futures",
+              "LEVERAGE": 3
          },
          "BINANCE-FUTURES": {
               "API_KEY": "13977e160539616c2ef17a95721415b350223c35468d23c5b929aae92ff31705",
               "API_SECRET": "1248746cfde73f6891a8ecd92cd0b3d4fe6f2e50b6392a9c94576e3626cc892d",
               "ENABLED": true,
               "TESTNET": true,
-              "MODE": "futures"
+              "MODE": "futures",
+              "LEVERAGE": 3
          },
          "BINANCE-SPOT": {
               "API_KEY": "your-spot-api-key-goes-here",
