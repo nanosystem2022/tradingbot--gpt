@@ -17,18 +17,23 @@ current_side = None
 def is_exchange_enabled(exchange_name):
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
+def set_leverage(exchange, symbol, leverage):
+    if isinstance(exchange, ccxt.binance):
+        exchange.fapiPrivate_post_leverage({
+            'symbol': symbol,
+            'leverage': leverage
+        })
+    elif 'bybit' in exchange.urls['api']['public']:
+        exchange.privateLinearPostPositionSetLeverage({
+            'symbol': symbol,
+            'leverage': leverage
+        })
+
 def create_order(data, exchange):
     symbol = data['symbol']
     order_type = data['type']
     side = data['side']
     quantity = data['quantity']
-
-    params = {}  # Initial parameters
-
-    # Add leverage only if the exchange supports it
-    if data['exchange'].upper() in ['BYBIT', 'BINANCE-FUTURES']:
-        leverage = config['EXCHANGES'][data['exchange'].upper()]['LEVERAGE']
-        params['leverage'] = leverage
 
     if side == "closelong":
         side = "sell"
@@ -36,10 +41,10 @@ def create_order(data, exchange):
         side = "buy"
 
     if order_type == "market":
-        order = exchange.create_market_order(symbol, side, quantity, params=params)
+        order = exchange.create_market_order(symbol, side, quantity)
     elif order_type == "limit":
         price = data['price']
-        order = exchange.create_limit_order(symbol, side, quantity, price, params=params)
+        order = exchange.create_limit_order(symbol, side, quantity, price)
     else:
         raise ValueError("Invalid order type")
 
@@ -115,13 +120,14 @@ if use_binance_spot:
             'defaultType': 'spot',
         }
     })
-
-@app.route('/webhook1', methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
     global current_position, current_side
     print("Hook Received!")
     data = json.loads(request.data)
     print(data)
+
+    leverage = config.get('LEVERAGE', 10)
 
     if int(data['key']) != config['KEY']:
         error_message = "Invalid Key, Please Try Again!"
@@ -134,6 +140,7 @@ def webhook():
     try:
         if data['exchange'] == 'binance-futures':
             if use_binance_futures:
+                set_leverage(exchange, data['symbol'], leverage)
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
                         response = create_order(data, exchange)
@@ -150,44 +157,26 @@ def webhook():
                 else:
                     raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
                 return {"status": "success", "data": response}, 200
-            else:
-                raise ValueError("Binance Futures is not enabled in the config file.")
-
-        elif data['exchange'] == 'binance-spot':
-            if use_binance_spot:
-                if data['side'] in ['buy', 'sell']:
-                    if can_open_order(current_position):
-                        response = create_order(data, exchange_spot)
-                        current_position = 'open'
-                        current_side = data['side']
-                    else:
-                        raise ValueError("Cannot open a new order until the current one is closed.")
-                else:
-                    raise ValueError("Invalid side value. Use 'buy' or 'sell'.")
-                return {"status": "success", "data": response}, 200
-            else:
-                raise ValueError("Binance Spot is not enabled in the config file.")
 
         elif data['exchange'] == 'bybit':
             if use_bybit:
+                set_leverage(session, data['symbol'], leverage)
                 if data['side'] in ['buy', 'sell']:
                     if can_open_order(current_position):
-                        response = create_order(data, session)
+                        response = create_order(data, session)  # Assuming you have a function for Bybit
                         current_position = 'open'
                         current_side = data['side']
                     else:
                         raise ValueError("Cannot open a new order until the current one is closed.")
                 elif data['side'] in ['closelong', 'closeshort']:
                     if can_close_order(current_position, current_side, data['side']):
-                        response = close_order(data, session)
+                        response = close_order(data, session)  # Assuming you have a function for Bybit
                         current_position = 'closed'
                     else:
                         raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
                 else:
                     raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
                 return {"status": "success", "data": response}, 200
-            else:
-                raise ValueError("Bybit is not enabled in the config file.")
 
         else:
             raise ValueError("Unsupported exchange.")
