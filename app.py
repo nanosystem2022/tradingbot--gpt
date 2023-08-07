@@ -1,14 +1,13 @@
 import json
 import os
-from flask import Flask, render_template, request, jsonify
-import time
+from flask import Flask, request, jsonify
 import ccxt
 from custom_http import HTTP
 
 app = Flask(__name__)
 
 # Load config.json
-with open('config.json') as config_file:
+with open(os.getenv('CONFIG_FILE', 'config.json')) as config_file:
     config = json.load(config_file)
 
 current_position = 'closed'
@@ -120,10 +119,12 @@ def webhook():
     """Handle incoming webhook requests."""
     global current_position, current_side
     print("Hook Received!")
-    data = json.loads(request.data)
-    print(data)
+    data = request.get_json(force=True)  # This will ensure the data is JSON
 
-    if int(data['key']) != config['KEY']:
+    if not data:
+        return {"status": "error", "message": "No data provided"}, 400
+
+    if 'key' not in data or int(data['key']) != config['KEY']:
         error_message = "Invalid Key, Please Try Again!"
         print(error_message)
         return {
@@ -196,4 +197,4 @@ def webhook():
         return handle_error(e)
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host=os.getenv('FLASK_HOST', '0.0.0.0'), port=int(os.getenv('FLASK_PORT', 5000)))
