@@ -12,10 +12,52 @@ with open(os.getenv('CONFIG_FILE', 'config.json')) as config_file:
 
 current_position = 'closed'
 current_side = None
+exchanges = {}
 
 def is_exchange_enabled(exchange_name):
     """Check if the exchange is enabled in the config."""
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
+
+def initialize_exchanges():
+    """Initialize enabled exchanges."""
+    if is_exchange_enabled('BYBIT'):
+        print("Bybit is enabled!")
+        exchanges['bybit'] = HTTP(
+            endpoint='https://api.bybit.com',
+            api_key=config['EXCHANGES']['BYBIT']['API_KEY'],
+            api_secret=config['EXCHANGES']['BYBIT']['API_SECRET']
+        )
+
+    if is_exchange_enabled('BINANCE-FUTURES'):
+        print("Binance is enabled!")
+        exchanges['binance-futures'] = ccxt.binance({
+            'apiKey': config['EXCHANGES']['BINANCE-FUTURES']['API_KEY'],
+            'secret': config['EXCHANGES']['BINANCE-FUTURES']['API_SECRET'],
+            'options': {
+                'defaultType': 'future',
+            },
+            'urls': {
+                'api': {
+                    'public': 'https://testnet.binancefuture.com/fapi/v1',
+                    'private': 'https://testnet.binancefuture.com/fapi/v1',
+                },
+            }
+        })
+
+        if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
+            exchanges['binance-futures'].set_sandbox_mode(True)
+
+    if is_exchange_enabled('BINANCE-SPOT'):
+        print("Binance Spot is enabled!")
+        exchanges['binance-spot'] = ccxt.binance({
+            'apiKey': config['EXCHANGES']['BINANCE-SPOT']['API_KEY'],
+            'secret': config['EXCHANGES']['BINANCE-SPOT']['API_SECRET'],
+            'options': {
+                'defaultType': 'spot',
+            }
+        })
+
+initialize_exchanges()
 
 def create_order(data, exchange):
     """Create a new order on the exchange."""
@@ -61,10 +103,6 @@ def close_order(data, exchange):
     )
     return order
 
-def handle_error(e):
-    """Handle exceptions and return a response with an error message."""
-    return {"status": "error", "message": str(e)}, 400 if isinstance(e, ValueError) else 500
-
 def can_open_order(current_position):
     """Check if a new order can be opened."""
     return current_position == 'closed'
@@ -73,46 +111,9 @@ def can_close_order(current_position, current_side, side):
     """Check if the current order can be closed."""
     return current_position == 'open' and ((current_side == 'buy' and side == 'closelong') or (current_side == 'sell' and side == 'closeshort'))
 
-use_bybit = is_exchange_enabled('BYBIT')
-use_binance_futures = is_exchange_enabled('BINANCE-FUTURES')
-use_binance_spot = is_exchange_enabled('BINANCE-SPOT')
-
-if use_bybit:
-    print("Bybit is enabled!")
-    session = HTTP(
-        endpoint='https://api.bybit.com',
-        api_key=config['EXCHANGES']['BYBIT']['API_KEY'],
-        api_secret=config['EXCHANGES']['BYBIT']['API_SECRET']
-    )
-
-if use_binance_futures:
-    print("Binance is enabled!")
-    exchange = ccxt.binance({
-        'apiKey': config['EXCHANGES']['BINANCE-FUTURES']['API_KEY'],
-        'secret': config['EXCHANGES']['BINANCE-FUTURES']['API_SECRET'],
-        'options': {
-            'defaultType': 'future',
-        },
-        'urls': {
-            'api': {
-                'public': 'https://testnet.binancefuture.com/fapi/v1',
-                'private': 'https://testnet.binancefuture.com/fapi/v1',
-            },
-        }
-    })
-
-    if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
-        exchange.set_sandbox_mode(True)
-
-if use_binance_spot:
-    print("Binance Spot is enabled!")
-    exchange_spot = ccxt.binance({
-        'apiKey': config['EXCHANGES']['BINANCE-SPOT']['API_KEY'],
-        'secret': config['EXCHANGES']['BINANCE-SPOT']['API_SECRET'],
-        'options': {
-            'defaultType': 'spot',
-        }
-    })
+def handle_error(e):
+    """Handle exceptions and return a response with an error message."""
+    return {"status": "error", "message": str(e)}, 400 if isinstance(e, ValueError) else 500
 
 @app.route('/webhook1', methods=['POST'])
 def webhook():
@@ -133,65 +134,27 @@ def webhook():
         }, 400
 
     try:
-        if data['exchange'] == 'binance-futures':
-            if use_binance_futures:
-                if data['side'] in ['buy', 'sell']:
-                    if can_open_order(current_position):
-                        response = create_order(data, exchange)
-                        current_position = 'open'
-                        current_side = data['side']
-                    else:
-                        raise ValueError("Cannot open a new order until the current one is closed.")
-                elif data['side'] in ['closelong', 'closeshort']:
-                    if can_close_order(current_position, current_side, data['side']):
-                        response = close_order(data, exchange)
-                        current_position = 'closed'
-                    else:
-                        raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
-                else:
-                    raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-                return {"status": "success", "data": response}, 200
-            else:
-                raise ValueError("Binance Futures is not enabled in the config file.")
+        exchange = exchanges.get(data['exchange'])
+        if not exchange:
+            raise ValueError(f"{data['exchange']} is not enabled in the config file.")
 
-        elif data['exchange'] == 'binance-spot':
-            if use_binance_spot:
-                if data['side'] in ['buy', 'sell']:
-                    if can_open_order(current_position):
-                        response = create_order(data, exchange_spot)
-                        current_position = 'open'
-                        current_side = data['side']
-                    else:
-                        raise ValueError("Cannot open a new order until the current one is closed.")
-                else:
-                    raise ValueError("Invalid side value. Use 'buy' or 'sell'.")
-                return {"status": "success", "data": response}, 200
+        if data['side'] in ['buy', 'sell']:
+            if can_open_order(current_position):
+                response = create_order(data, exchange)
+                current_position = 'open'
+                current_side = data['side']
             else:
-                raise ValueError("Binance Spot is not enabled in the config file.")
-
-        elif data['exchange'] == 'bybit':
-            if use_bybit:
-                if data['side'] in ['buy', 'sell']:
-                    if can_open_order(current_position):
-                        response = create_order_bybit(data, session)
-                        current_position = 'open'
-                        current_side = data['side']
-                    else:
-                        raise ValueError("Cannot open a new order until the current one is closed.")
-                elif data['side'] in ['closelong', 'closeshort']:
-                    if can_close_order(current_position, current_side, data['side']):
-                        response = close_order_bybit(data, session)
-                        current_position = 'closed'
-                    else:
-                        raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
-                else:
-                    raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
-                return {"status": "success", "data": response}, 200
+                raise ValueError("Cannot open a new order until the current one is closed.")
+        elif data['side'] in ['closelong', 'closeshort']:
+            if can_close_order(current_position, current_side, data['side']):
+                response = close_order(data, exchange)
+                current_position = 'closed'
             else:
-                raise ValueError("Bybit is not enabled in the config file.")
-
+                raise ValueError("Cannot close the order. Either there is no open order or the side of the closing order does not match the side of the open order.")
         else:
-            raise ValueError("Unsupported exchange.")
+            raise ValueError("Invalid side value. Use 'buy', 'sell', 'closelong' or 'closeshort'.")
+
+        return {"status": "success", "data": response}, 200
 
     except Exception as e:
         return handle_error(e)
