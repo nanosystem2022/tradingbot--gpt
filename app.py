@@ -115,7 +115,7 @@ if use_binance_spot:
         }
     })
 
-@app.route('/webhook', methods=['POST'])
+@app.route('/webhook1', methods=['POST'])
 def webhook():
     """Handle incoming webhook requests."""
     global current_position, current_side
