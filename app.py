@@ -18,8 +18,25 @@ def is_exchange_enabled(exchange_name):
     """Check if the exchange is enabled in the config."""
     return exchange_name in config['EXCHANGES'] and config['EXCHANGES'][exchange_name]['ENABLED']
 
+def set_leverage(exchange, leverage):
+    """Set the leverage for the exchange."""
+    markets = exchange.load_markets()
+    for symbol in markets:
+        if exchange.has['fapiPrivate']:
+            exchange.fapiPrivate_post_leverage({
+                'symbol': symbol,
+                'leverage': leverage
+            })
+        elif exchange.has['private_linear_post_position_leverage']:
+            exchange.private_linear_post_position_leverage_create({
+                'symbol': symbol,
+                'buy_leverage': leverage,
+                'sell_leverage': leverage
+            })
+
 def initialize_exchanges():
     """Initialize enabled exchanges."""
+    leverage = config.get('LEVERAGE', 1)  # Default leverage is 1
     if is_exchange_enabled('BYBIT'):
         print("Bybit is enabled!")
         exchanges['bybit'] = HTTP(
@@ -27,6 +44,7 @@ def initialize_exchanges():
             api_key=config['EXCHANGES']['BYBIT']['API_KEY'],
             api_secret=config['EXCHANGES']['BYBIT']['API_SECRET']
         )
+        set_leverage(exchanges['bybit'], leverage)
 
     if is_exchange_enabled('BINANCE-FUTURES'):
         print("Binance is enabled!")
@@ -43,6 +61,7 @@ def initialize_exchanges():
                 },
             }
         })
+        set_leverage(exchanges['binance-futures'], leverage)
 
         if config['EXCHANGES']['BINANCE-FUTURES']['TESTNET']:
             exchanges['binance-futures'].set_sandbox_mode(True)
@@ -79,11 +98,6 @@ def create_order(data, exchange):
     order_type = data['type']
     side = data['side']
     quantity = data['quantity']
-    leverage = data.get('leverage', config['EXCHANGES'][data['exchange']].get('leverage', 1))  # Get the leverage from the data, or use the default from the config, or use 1 as a last resort
-
-    # Set the leverage
-    if hasattr(exchange, 'setLeverage'):
-        exchange.setLeverage(leverage, symbol)
 
     if side == "closelong":
         side = "sell"
