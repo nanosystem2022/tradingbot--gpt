@@ -6,7 +6,7 @@
             "API_SECRET": "api-secret-goes-here",
             "ENABLED": false,
             "MODE": "futures",
-            "LEVERAGE": 100
+            "LEVERAGE": 1
         },
         "BINANCE-FUTURES": {
             "API_KEY": "13977e160539616c2ef17a95721415b350223c35468d23c5b929aae92ff31705",
@@ -14,7 +14,7 @@
             "ENABLED": true,
             "TESTNET": true,
             "MODE": "futures",
-            "LEVERAGE": 100
+            "LEVERAGE": 1
         },
         "BINANCE-SPOT": {
             "API_KEY": "your-spot-api-key-goes-here",
@@ -26,13 +26,13 @@
             "API_KEY": "your-bingx-api-key-goes-here",
             "API_SECRET": "your-bingx-api-secret-goes-here",
             "ENABLED": false,
-            "LEVERAGE": 100
+            "LEVERAGE": 1
         },
         "MEXC": {
             "API_KEY": "your-mexc-api-key-goes-here",
             "API_SECRET": "your-mexc-api-secret-goes-here",
             "ENABLED": false,
-            "LEVERAGE": 100
+            "LEVERAGE": 1
         }
     }
 }
