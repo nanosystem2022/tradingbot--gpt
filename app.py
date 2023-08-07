@@ -39,11 +39,10 @@ def initialize_exchanges():
     leverage = config.get('LEVERAGE', 1)  # Default leverage is 1
     if is_exchange_enabled('BYBIT'):
         print("Bybit is enabled!")
-        exchanges['bybit'] = HTTP(
-            endpoint='https://api.bybit.com',
-            api_key=config['EXCHANGES']['BYBIT']['API_KEY'],
-            api_secret=config['EXCHANGES']['BYBIT']['API_SECRET']
-        )
+        exchanges['bybit'] = ccxt.bybit({
+            'apiKey': config['EXCHANGES']['BYBIT']['API_KEY'],
+            'secret': config['EXCHANGES']['BYBIT']['API_SECRET']
+        })
         set_leverage(exchanges['bybit'], leverage)
 
     if is_exchange_enabled('BINANCE-FUTURES'):
