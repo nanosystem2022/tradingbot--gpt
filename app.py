@@ -57,6 +57,20 @@ def initialize_exchanges():
             }
         })
 
+    if is_exchange_enabled('BINGX'):
+        print("BingX is enabled!")
+        exchanges['bingx'] = ccxt.bingx({
+            'apiKey': config['EXCHANGES']['BINGX']['API_KEY'],
+            'secret': config['EXCHANGES']['BINGX']['API_SECRET'],
+        })
+
+    if is_exchange_enabled('MEXC'):
+        print("MEXC is enabled!")
+        exchanges['mexc'] = ccxt.mexc({
+            'apiKey': config['EXCHANGES']['MEXC']['API_KEY'],
+            'secret': config['EXCHANGES']['MEXC']['API_SECRET'],
+        })
+
 initialize_exchanges()
 
 def create_order(data, exchange):
