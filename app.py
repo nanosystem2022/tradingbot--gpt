@@ -79,6 +79,11 @@ def create_order(data, exchange):
     order_type = data['type']
     side = data['side']
     quantity = data['quantity']
+    leverage = data.get('leverage', config['EXCHANGES'][data['exchange']].get('leverage', 1))  # Get the leverage from the data, or use the default from the config, or use 1 as a last resort
+
+    # Set the leverage
+    if hasattr(exchange, 'setLeverage'):
+        exchange.setLeverage(leverage, symbol)
 
     if side == "closelong":
         side = "sell"
